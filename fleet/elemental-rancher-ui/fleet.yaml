@@ -1,0 +1,22 @@
+namespace: cattle-elemental-system
+
+helm:
+  ### These options control how "fleet apply" downloads the chart
+  #
+  # Use a custom location for the Helm chart. This can refer to any go-getter URL or
+  # OCI registry based helm chart URL e.g. "oci://ghcr.io/fleetrepoci/guestbook".
+  # This allows one to download charts from most any location.  Also know that
+  # go-getter URL supports adding a digest to validate the download. If repo
+  # is set below this field is the name of the chart to lookup.
+  # It is possible to download the chart from a Git repository, e.g.
+  # by using `git@github.com:rancher/fleet-examples//single-cluster/helm`. If a
+  # secret for the SSH key was defined in the GitRepo via `helmSecretName`, it
+  # will be injected into the chart URL.
+  # Git repositories can be downloaded via unauthenticated http, by using for example:
+  # `git::http://github.com/rancher/fleet-examples//single-cluster/helm`.
+  chart: git@github.com:rancher/ui-plugin-charts//charts/elemental
+  # A https URL to a Helm repo to download the chart from. It's typically easier
+  # to just use `chart` field and refer to a tgz file.  If repo is used the
+  # value of `chart` will be used as the chart name to lookup in the Helm repository.
+  # repo: https://charts.rancher.io
+  version: 1.3.0

@@ -1,0 +1,6 @@
+namespace: cattle-elemental-system
+
+helm:
+  chart: oci://registry.suse.com/rancher/elemental-operator-crds-chart
+  # version: 1.4.3
+
