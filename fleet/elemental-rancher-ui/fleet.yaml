@@ -14,7 +14,7 @@ helm:
   # will be injected into the chart URL.
   # Git repositories can be downloaded via unauthenticated http, by using for example:
   # `git::http://github.com/rancher/fleet-examples//single-cluster/helm`.
-  chart: git@github.com:rancher/ui-plugin-charts//charts/elemental/1.3.0
+  chart: git::http://github.com/rancher/ui-plugin-charts//charts/elemental/1.3.0
   # A https URL to a Helm repo to download the chart from. It's typically easier
   # to just use `chart` field and refer to a tgz file.  If repo is used the
   # value of `chart` will be used as the chart name to lookup in the Helm repository.
