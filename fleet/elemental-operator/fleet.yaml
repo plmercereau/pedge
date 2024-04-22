@@ -2,5 +2,5 @@ namespace: cattle-elemental-system
 
 helm:
   chart: oci://registry.suse.com/rancher/elemental-operator-chart
-  # version: 1.4.3
+  version: 1.4.3
 
