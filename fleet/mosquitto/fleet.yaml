@@ -1,6 +1,5 @@
 namespace: mosquitto
 
 helm:
-  chart: mosquitto
-  repo: oci://tccr.io/truecharts
+  chart: oci://tccr.io/truecharts/mosquitto
   version: 15.0.6
