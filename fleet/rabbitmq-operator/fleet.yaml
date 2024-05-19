@@ -1,0 +1,6 @@
+defaultNamespace: system-rabbitmq
+
+helm:
+  chart: oci://registry-1.docker.io/bitnamicharts/rabbitmq-cluster-operator
+  version: 2.9.0
+
