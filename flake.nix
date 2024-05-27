@@ -124,7 +124,9 @@
                 packages = with pkgs; [
                   go
                   kubectl
-                  helmfile
+                  tilt
+                  mqttui # MQTT client, for testing purpose
+                  platformio-core
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                 ];
               }

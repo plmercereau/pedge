@@ -1,0 +1,59 @@
+{{- range .Values.devices }}
+  {{ .name }}: {{ .value }}
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: {{ .name }}
+spec:
+  rabbitmqClusterReference:
+    name: {{ $.Values.cluster.name }}
+  importCredentialsSecret:
+    name: {{ .name }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .name }}-user-credentials # It seems the "-user-credentials" suffix is managed by the rabbitmq topology operator
+type: Opaque
+data:
+  username: {{ .name | b64enc | quote }}
+  password: {{ .password | default (include "userPassword" (dict "name" .name "namespace" $.Release.Namespace)) | b64enc | quote }}
+
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: {{ .name }}
+spec:
+  vhost: "/"
+  userReference:
+    name: {{ .name }}
+  permissions:
+    configure: "^mqtt-subscription-.*$"
+    write: "^amq\\.topic$|^mqtt-subscription-.*$"
+    read: "^amq\\.topic$|^mqtt-subscription-.*$"
+  rabbitmqClusterReference:
+    name: {{ $.Values.cluster.name }}
+
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: TopicPermission
+metadata:
+  name: {{ .name }}
+spec:
+  vhost: "/"
+  userReference:
+    name: {{ .name }}
+  permissions:
+    exchange: "amq.topic"
+    # Allow to write to any sub-topic of the queue/device name
+    write: "^{{ $.Values.queue.name }}\\.{{ .name }}\\..+$"
+    # read: "^{{ $.Values.queue.name }}\\.{{ .name }}\\..+$"
+    read: "" # * Only allow to write, not read
+  rabbitmqClusterReference:
+    name: {{ $.Values.cluster.name }}
+
+{{- end }}
+
+

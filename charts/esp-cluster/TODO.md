@@ -1,0 +1,17 @@
+- create jobs to build the firmware
+  - platformio builder image
+    - include the firmware code inside the docker image
+    - env vars: user name, SIM PIN, password
+- store the firmware to an S3 bucket
+- convert the chart to an operator
+  - "Device" CRD
+  - "DeviceCluster" CRD
+- configure prometheus/grafana
+  - MQTT exporter
+  - Grafana map
+- develop a rancher UI interface
+  - CRUD devices
+  - firmware build status
+  - download firmwares
+  - installation script (if possible)
+- secure firmware - efuse etc

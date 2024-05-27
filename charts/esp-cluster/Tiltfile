@@ -1,0 +1,23 @@
+
+load('ext://helm_resource', 'helm_resource', 'helm_repo')
+
+helm_resource('cert-manager', 
+    'oci://registry-1.docker.io/bitnamicharts/cert-manager',
+    flags = ['--version=1.2.1', '--set=installCRDs=true'])
+
+helm_resource('rabbitmq-cluster-operator', 
+    'oci://registry-1.docker.io/bitnamicharts/rabbitmq-cluster-operator', 
+    namespace='rabbitmq-system',
+    flags = ['--version=4.2.10', '--set=useCertManager=true', '--create-namespace'],
+    resource_deps = [ 'cert-manager'])
+
+# TODO wait for rabbitmq-cluster-operator
+load('ext://namespace', 'namespace_create', 'namespace_inject')
+namespace_create('esp-cluster')
+k8s_yaml(helm('.', namespace='esp-cluster', values=['./values.yaml']))
+
+# helm_resource('esp-cluster', # ! does not watch for changes in values.yaml
+#     '.', 
+#     namespace='esp-cluster',
+#     flags = ['--values=./values.yaml', '--create-namespace'],
+#     resource_deps = [ 'rabbitmq-cluster-operator'])

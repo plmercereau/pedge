@@ -1,0 +1,28 @@
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: {{ .Values.cluster.name }}
+spec:
+  service:
+    # type: ClusterIP
+    type: LoadBalancer
+  rabbitmq:
+    additionalPlugins:
+      - rabbitmq_mqtt
+# ---
+# apiVersion: traefik.containo.us/v1alpha1
+# kind: IngressRouteTCP
+# metadata:
+#   name: rabbitmq-mqtt
+# spec:
+#   entryPoints:
+#     - mqtt
+#   routes:
+#     - match: HostSNI(`mqtt.142.132.245.124.sslip.io`)
+#       services:
+#         - name: rabbitmq-mqtt
+#           port: 1883
+#   tls:
+#     passthrough: true
+# TODO https://community.traefik.io/t/tls-certificates-not-auto-generated-for-ingressroutertcp/19754
+

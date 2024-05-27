@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-and-upload-{{ .name }}
+spec:
+  template:
+    metadata:
+      annotations:
+        checksum/secret: "{{ .Values.secretChecksum }}" # TODO
+    spec:
+      initContainers:
+      - name: build-firmware
+        image: your-build-image:latest
+        command: ["sh", "-c", "build your file and zip it into /data/file.zip"]
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /data
+      containers:
+      - name: upload-firmware
+        image: minio/mc:RELEASE.2024-05-09T17-04-24Z
+        # TODO
+        command: ["sh", "-c", "aws s3 cp /data/file.zip s3://your-bucket-name/"]
+        env:
+        - name: USERNAME
+          value: "{{ .name }}"
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "{{.name}}-user-credentials"
+              key: password
+        # TODO SIM PIN
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /data
+      restartPolicy: Never
+      volumes:
+      - name: shared-volume
+        emptyDir: {}
+  backoffLimit: 4

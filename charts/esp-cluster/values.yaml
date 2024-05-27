@@ -1,0 +1,12 @@
+cluster:
+  name: esp-cluster
+
+queue:
+  name: esp-queue
+
+devices:
+- name: test
+  network:
+    gsm:
+      pin: 1234
+
