@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 env:
-  image_name: esp-monitor
+  package_name: esp-monitor
 
 jobs:
   build:
@@ -21,7 +21,7 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
       - name: Build image
-        run: nix build .\#${{ env.image_name }}
+        run: nix build .\#${{ env.package_name }}
       - name: Load Docker image
         run: docker load < result
       - name: Login to Docker Hub
@@ -29,8 +29,14 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      # - name: Tag Docker image
-      #   run: |
-      #     docker tag ${{ env.image_name }}:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.image_name }}:${{ github.sha }}
+      - name: Fetch image name
+        id: image-name
+        run: echo "IMAGE_NAME=$(nix eval .\#${{ env.package_name }}.imageName | jq -r)" >> "$GITHUB_OUTPUT"
+      - name: Tag Docker image
+        env:
+          IMAGE_NAME: ${{ steps.image-name.outputs.IMAGE_NAME }}
+        run: docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
       - name: Push Docker image
-        run: docker push --all-tags $(nix eval .\#${{ env.image_name }}.imageName | jq -r)
+        env:
+          IMAGE_NAME: ${{ steps.image-name.outputs.IMAGE_NAME }}
+        run: docker push --all-tags $IMAGE_NAME
