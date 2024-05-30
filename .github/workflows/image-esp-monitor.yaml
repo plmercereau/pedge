@@ -35,7 +35,7 @@ jobs:
       - name: Tag Docker image
         env:
           IMAGE_NAME: ${{ steps.image-name.outputs.IMAGE_NAME }}
-        run: docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
+        run: docker tag $IMAGE_NAME:latest $IMAGE_NAME:${{ github.sha }}
       - name: Push Docker image
         env:
           IMAGE_NAME: ${{ steps.image-name.outputs.IMAGE_NAME }}
