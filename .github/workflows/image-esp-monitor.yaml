@@ -33,4 +33,4 @@ jobs:
       #   run: |
       #     docker tag ${{ env.image_name }}:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.image_name }}:${{ github.sha }}
       - name: Push Docker image
-        run: docker push --all-tags ${{ env.image_name }}
+        run: docker push --all-tags $(nix eval .\#${{ env.image_name }}.imageName | jq -r)
