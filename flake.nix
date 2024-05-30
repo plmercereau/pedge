@@ -25,6 +25,7 @@
     in {
       packages = rec {
         devenv-up = self.devShells.${system}.default.config.procfileScript;
+        esp-monitor = import ./esp-monitor/package.nix {inherit pkgs;};
 
         # TODO move to a separate flake / nix file
         installer = let
@@ -115,7 +116,10 @@
 
       devShells = {
         default = let
-          pkgs = nixpkgs-devenv.legacyPackages.${system};
+          pkgs = import nixpkgs-devenv {
+            inherit system;
+            config.allowUnfree = true;
+          };
         in
           devenv.lib.mkShell {
             inherit inputs pkgs;
@@ -127,6 +131,7 @@
                   tilt
                   mqttui # MQTT client, for testing purpose
                   platformio-core
+                  ngrok
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                 ];
               }

@@ -11,6 +11,12 @@ helm_resource('rabbitmq-cluster-operator',
     flags = ['--version=4.2.10', '--set=useCertManager=true', '--create-namespace'],
     resource_deps = [ 'cert-manager'])
 
+helm_resource('kube-prometheus', 
+    'oci://registry-1.docker.io/bitnamicharts/kube-prometheus', 
+    namespace='prometheus',
+    flags = ['--version=9.1.2', '--create-namespace'],
+    resource_deps = [ 'cert-manager'])
+
 # TODO wait for rabbitmq-cluster-operator
 load('ext://namespace', 'namespace_create', 'namespace_inject')
 namespace_create('esp-cluster')

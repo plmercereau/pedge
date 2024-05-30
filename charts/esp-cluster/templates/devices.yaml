@@ -49,8 +49,9 @@ spec:
     exchange: "amq.topic"
     # Allow to write to any sub-topic of the queue/device name
     write: "^{{ $.Values.queue.name }}\\.{{ .name }}\\..+$"
-    # read: "^{{ $.Values.queue.name }}\\.{{ .name }}\\..+$"
-    read: "" # * Only allow to write, not read
+    # TODO restrict back to no writes
+    read: "^{{ $.Values.queue.name }}\\.{{ .name }}\\..+$"
+    # read: "" # * Only allow to write, not read
   rabbitmqClusterReference:
     name: {{ $.Values.cluster.name }}
 
