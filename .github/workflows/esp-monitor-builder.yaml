@@ -32,3 +32,5 @@ jobs:
           push: true
           tags: plmercereau/esp-monitor-builder:latest
           context: esp-monitor
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
