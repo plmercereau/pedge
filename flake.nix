@@ -25,7 +25,6 @@
     in {
       packages = rec {
         devenv-up = self.devShells.${system}.default.config.procfileScript;
-        esp-monitor = import ./esp-monitor/package.nix {inherit pkgs;};
 
         # TODO move to a separate flake / nix file
         installer = let
