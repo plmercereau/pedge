@@ -1,0 +1,50 @@
+{{- range .Values.devices }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-and-upload-firmware-{{ .name }}
+spec:
+  template:
+    metadata:
+      annotations:
+        checksum/values: "{{ include "checksum" . }}"
+    spec:
+      initContainers:
+        - name: build-firmware
+          image: plmercereau/esp-monitor-builder:latest
+          volumeMounts:
+            - name: build
+              mountPath: /firmware
+          env:
+            - name: GSM_PIN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{.name}}-user-credentials"
+                  key: gsm_pin
+            - name: MQTT_BROKER
+              value: TODO # TODO
+            - name: MQTT_PORT
+              value: 1883 # TODO get from values
+            - name: DEVICE_NAME
+              value: "{{ .name }}"
+            - name: MQTT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{.name}}-user-credentials"
+                  key: password
+      containers:
+        - name: upload-firmware
+          image: minio/mc:RELEASE.2024-05-09T17-04-24Z
+          # TODO
+          command: ["sh", "-c", "aws s3 cp /firmware/file.zip s3://your-bucket-name/"]
+          volumeMounts:
+            - name: build
+              mountPath: /firmware
+      restartPolicy: Never
+      volumes:
+        - name: build
+          emptyDir: {}
+  backoffLimit: 4
+{{- end }}
+
+

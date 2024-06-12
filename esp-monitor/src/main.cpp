@@ -3,11 +3,7 @@
 #include <esp32.h>
 #include <ArduinoJson.h>
 
-#define MQTT_BROKER ""
-#define MQTT_PORT 15741 
-#define DEVICE_NAME "test"
-#define MQTT_PASSWORD "1234"
-#define GSM_PIN "1234"
+// TODO custom topic
 #define TOPIC_SENSORS "esp-queue"
 
 const String clientId = String(DEVICE_NAME) + "-" + getESP32ChipID();

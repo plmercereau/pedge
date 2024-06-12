@@ -1,5 +1,4 @@
 {{- range .Values.devices }}
-  {{ .name }}: {{ .value }}
 apiVersion: rabbitmq.com/v1beta1
 kind: User
 metadata:
@@ -9,8 +8,8 @@ spec:
     name: {{ $.Values.cluster.name }}
   importCredentialsSecret:
     name: {{ .name }}
-
 ---
+
 apiVersion: v1
 kind: Secret
 metadata:
@@ -19,6 +18,11 @@ type: Opaque
 data:
   username: {{ .name | b64enc | quote }}
   password: {{ .password | default (include "userPassword" (dict "name" .name "namespace" $.Release.Namespace)) | b64enc | quote }}
+  {{- if and (hasKey . "network") (hasKey .network "gsm") (hasKey .network.gsm "pin") }}
+  gsm_pin: {{ .network.gsm.pin | b64enc | quote }}
+  {{- else }}
+  gsm_pin: {{ "0000" | b64enc | quote }}
+  {{- end }}
 
 ---
 apiVersion: rabbitmq.com/v1beta1
@@ -35,8 +39,8 @@ spec:
     read: "^amq\\.topic$|^mqtt-subscription-.*$"
   rabbitmqClusterReference:
     name: {{ $.Values.cluster.name }}
-
 ---
+
 apiVersion: rabbitmq.com/v1beta1
 kind: TopicPermission
 metadata:
@@ -54,7 +58,7 @@ spec:
     # read: "" # * Only allow to write, not read
   rabbitmqClusterReference:
     name: {{ $.Values.cluster.name }}
-
+---
 {{- end }}
 
 

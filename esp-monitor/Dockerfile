@@ -6,9 +6,9 @@ RUN apt update && \
     apt install -y git && \
     apt-get clean autoclean && apt-get autoremove --yes && rm -rf /var/lib/{apt,dpkg,cache,log}/ && \
     pip install -U platformio==${APP_VERSION} && \
-    mkdir -p /workspace && \
+    mkdir -p /workspace /firmware && \
     adduser --disabled-password pio && \
-    chown -R pio:pio /workspace
+    chown -R pio:pio /workspace /firmware
 
 USER pio
 RUN platformio platform install espressif32

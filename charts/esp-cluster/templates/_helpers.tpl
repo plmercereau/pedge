@@ -10,3 +10,13 @@
   {{- $randSecret }}
 {{- end -}}
 {{- end -}}
+
+
+{{- define "checksum" -}}
+{{- $context := . -}}
+{{- $out := "" -}}
+{{- range $key, $value := $context -}}
+{{- $out = printf "%s%s" $out $value | sha256sum -}}
+{{- end -}}
+{{- $out | sha256sum -}}
+{{- end -}}
