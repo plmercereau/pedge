@@ -11,9 +11,11 @@ spec:
     spec:
       initContainers:
         - name: build-firmware
-          image: plmercereau/esp-monitor-builder:latest
+          # TODO use bitnami common template e.g. https://github.com/bitnami/charts/blob/e2e5d5f7ff623382dfabe527a6517069fcdae56d/bitnami/minio/templates/standalone/deployment.yaml#L81
+          image: "{{ $.Values.firmware.builder.image.registry }}/{{ $.Values.firmware.builder.image.repository }}:{{ $.Values.firmware.builder.image.tag }}"
+          imagePullPolicy: {{ $.Values.firmware.builder.image.pullPolicy }}
           volumeMounts:
-            - name: build
+            - name: firmware
               mountPath: /firmware
           env:
             - name: GSM_PIN
@@ -22,9 +24,9 @@ spec:
                   name: "{{.name}}-user-credentials"
                   key: gsm_pin
             - name: MQTT_BROKER
-              value: "{{ $.Values.broker.host }}"
+              value: "{{ $.Values.cluster.host }}"
             - name: MQTT_PORT
-              value: "{{ (printf "%v" $.Values.broker.port) }}"
+              value: "{{ (printf "%v" $.Values.cluster.port) }}"
             - name: DEVICE_NAME
               value: "{{ .name }}"
             - name: MQTT_PASSWORD
@@ -34,17 +36,41 @@ spec:
                   key: password
       containers:
         - name: upload-firmware
-          image: minio/mc:RELEASE.2024-05-09T17-04-24Z
-          # TODO
-          command: ["sh", "-c", "aws s3 cp /firmware/file.zip s3://your-bucket-name/"]
+          image: amazon/aws-cli:2.16.6
+          command: ["sh", "-c", "aws s3 cp /firmware/firmware.bin s3://{{ $.Values.firmware.storage.bucket }}/{{ .name }}.bin"]
+          env:
+            - name: AWS_ENDPOINT_URL_S3
+              value: "{{ $.Values.firmware.storage.endpoint }}"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: firmware-storage-credentials
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: firmware-storage-credentials
+                  key: secret-access-key
           volumeMounts:
-            - name: build
+            - name: firmware
               mountPath: /firmware
       restartPolicy: Never
       volumes:
-        - name: build
+        - name: firmware
           emptyDir: {}
   backoffLimit: 4
+---
 {{- end }}
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: firmware-storage-credentials
+type: Opaque
+data:
+  access-key-id: {{ .Values.firmware.storage.accessKeyId | b64enc | quote }}
+  secret-access-key: {{ .Values.firmware.storage.secretAccessKey | b64enc | quote }}
+
+---
 
 

@@ -20,3 +20,18 @@
 {{- end -}}
 {{- $out | sha256sum -}}
 {{- end -}}
+
+{{- /*
+Ensure that device names are unique
+*/ -}}
+{{- define "check.unique.device.names" -}}
+{{- $devices := .Values.devices -}}
+{{- $nameMap := dict -}}
+{{- range $index, $device := $devices -}}
+  {{- if hasKey $nameMap $device.name -}}
+    {{- fail (printf "Duplicate device name found: %s" $device.name) -}}
+  {{- else -}}
+    {{- $_ := set $nameMap $device.name true -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}

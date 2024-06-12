@@ -1,3 +1,4 @@
+{{- include "check.unique.device.names" . -}}
 {{- range .Values.devices }}
 apiVersion: rabbitmq.com/v1beta1
 kind: User
