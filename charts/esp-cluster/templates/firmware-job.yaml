@@ -22,9 +22,9 @@ spec:
                   name: "{{.name}}-user-credentials"
                   key: gsm_pin
             - name: MQTT_BROKER
-              value: TODO # TODO
+              value: "{{ $.Values.broker.host }}"
             - name: MQTT_PORT
-              value: 1883 # TODO get from values
+              value: "{{ (printf "%v" $.Values.broker.port) }}"
             - name: DEVICE_NAME
               value: "{{ .name }}"
             - name: MQTT_PASSWORD

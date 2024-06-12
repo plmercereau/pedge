@@ -19,7 +19,7 @@ data:
   username: {{ .name | b64enc | quote }}
   password: {{ .password | default (include "userPassword" (dict "name" .name "namespace" $.Release.Namespace)) | b64enc | quote }}
   {{- if and (hasKey . "network") (hasKey .network "gsm") (hasKey .network.gsm "pin") }}
-  gsm_pin: {{ .network.gsm.pin | b64enc | quote }}
+  gsm_pin: {{ printf "%v" .network.gsm.pin | b64enc | quote }}
   {{- else }}
   gsm_pin: {{ "0000" | b64enc | quote }}
   {{- end }}
