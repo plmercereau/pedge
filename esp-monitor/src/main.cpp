@@ -8,7 +8,7 @@
 
 const String clientId = String(DEVICE_NAME) + "-" + getESP32ChipID();
 
-const String topicLocation = (String(TOPIC_SENSORS) + "/" + DEVICE_NAME + "/location");
+const String topicCoordinates = (String(TOPIC_SENSORS) + "/" + DEVICE_NAME + "/coordinates");
 
 #define TINY_GSM_MODEM_SIM7600
 
@@ -82,7 +82,7 @@ boolean mqttConnect() {
     return mqtt.connected();
 }
 
-void sendLocation() {
+void sendCoordinates() {
     JsonDocument message;
 
     modem.enableGPS();
@@ -101,23 +101,23 @@ void sendLocation() {
     int   min      = 0;
     int   sec      = 0;
     for (int8_t i = 15; i; i--) {
-        SerialMon.println("Requesting current GPS/GNSS/GLONASS location");
+        SerialMon.println("Requesting current GPS/GNSS/GLONASS coordinates");
         if (modem.getGPS(&lat, &lon, &speed, &alt, &vsat, &usat, &accuracy, &year, &month, &day, &hour, &min, &sec)) {
-            message["location"]["latitude"] = lat;
-            message["location"]["longitude"] = lon;
-            message["location"]["altitude"] = alt;
+            message["latitude"] = lat;
+            message["longitude"] = lon;
+            message["altitude"] = alt;
             message["speed"] = speed;
             char timestamp[25];
             sprintf(timestamp, "%04d-%02d-%02dT%02d:%02d:%02dZ", year, month, day, hour, min, sec);
             message["timestamp"] = timestamp;
 
-            mqtt.beginPublish(topicLocation.c_str(), measureJson(message), true); // TODO retained = true. What does it mean?
+            mqtt.beginPublish(topicCoordinates.c_str(), measureJson(message), true); // TODO retained = true. What does it mean?
             serializeJson(message, mqtt);
             mqtt.endPublish();
 
             break;
         } else {
-            SerialMon.println("Couldn't get GPS/GNSS/GLONASS location, retrying in 15s.");
+            SerialMon.println("Couldn't get GPS/GNSS/GLONASS coordinates, retrying in 15s.");
             delay(15000L);
         }
     }
@@ -252,7 +252,7 @@ void loop() {
         return;
     }
 
-    sendLocation();
+    sendCoordinates();
     
     // TODO optimisation: sleep between sending data
     // esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);

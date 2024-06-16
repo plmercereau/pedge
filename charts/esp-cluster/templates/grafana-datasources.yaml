@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-datasources
+  labels:
+    grafana_datasource: "1"
+stringData:
+  influxdb-datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: InfluxDB
+        type: influxdb
+        #url: http://influxdb.{{ .Release.Namespace }}.svc
+        url: "http://${INFLUXDB_SERVICE_HOST}"
+        access: proxy
+        isDefault: true
+        basicAuth: true
+        basicAuthUser: "{{ .Values.influxdb.adminUser.user }}"
+        jsonData:
+          defaultBucket: "{{ .Values.influxdb.adminUser.bucket }}"
+          organization: "{{ .Values.influxdb.adminUser.organization }}"
+          httpMode: POST
+          version: Flux
+        secureJsonData:
+          #basicAuthPassword: $INFLUXDB_PASSWORD
+          #token: $INFLUXDB_TOKEN
+          basicAuthPassword: "{{ .Values.influxdb.adminUser.password }}"
+          token: "{{ .Values.influxdb.adminUser.token }}"

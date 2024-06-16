@@ -1,9 +1,12 @@
 {{- include "check.unique.device.names" . -}}
 {{- range .Values.devices }}
+{{- $password := (.password | default (include "userPassword" (dict "name" .name "namespace" $.Release.Namespace))) -}}
 apiVersion: rabbitmq.com/v1beta1
 kind: User
 metadata:
   name: {{ .name }}
+  annotations:
+    checksum/password: "{{ $password | sha256sum }}"
 spec:
   rabbitmqClusterReference:
     name: {{ $.Values.cluster.name }}
@@ -14,11 +17,12 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ .name }}-user-credentials # It seems the "-user-credentials" suffix is managed by the rabbitmq topology operator
+  # * It seems the "-user-credentials" suffix is managed by the rabbitmq topology operator
+  name: {{ .name }}-user-credentials 
 type: Opaque
 data:
   username: {{ .name | b64enc | quote }}
-  password: {{ .password | default (include "userPassword" (dict "name" .name "namespace" $.Release.Namespace)) | b64enc | quote }}
+  password: {{ $password | b64enc | quote }}
   {{- if and (hasKey . "network") (hasKey .network "gsm") (hasKey .network.gsm "pin") }}
   gsm_pin: {{ printf "%v" .network.gsm.pin | b64enc | quote }}
   {{- else }}

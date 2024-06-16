@@ -37,7 +37,9 @@ spec:
       containers:
         - name: upload-firmware
           image: amazon/aws-cli:2.16.6
-          command: ["sh", "-c", "aws s3 cp /firmware/firmware.bin s3://{{ $.Values.firmware.storage.bucket }}/{{ .name }}.bin"]
+          command: ["sh", "-c", "ls"]
+          # TODO implement
+          # command: ["sh", "-c", "aws s3 cp /firmware/firmware.bin s3://{{ $.Values.firmware.storage.bucket }}/{{ .name }}.bin"]
           env:
             - name: AWS_ENDPOINT_URL_S3
               value: "{{ $.Values.firmware.storage.endpoint }}"

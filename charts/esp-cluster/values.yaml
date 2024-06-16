@@ -1,12 +1,150 @@
+# TODO remove the testing values
+# TODO not ideally named - cluster is misleading
 cluster:
   name: esp-cluster
+  # TODO should not be needed when exposing the service
+  host: 5.tcp.eu.ngrok.io
+  port: 17375
 
 queue:
   name: esp-queue
 
 devices:
-- name: test
-  network:
-    gsm:
-      pin: 1234
+  - name: test
+    network:
+      gsm:
+        pin: 1234
 
+firmware:
+  builder:
+    image:
+      # TODO use bitnami common template https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_images.tpl
+      registry: plmercereau
+      repository: esp-monitor-builder
+      tag: latest # TODO use the git commit hash
+      pullPolicy: IfNotPresent
+  storage:
+    # TODO
+    endpoint: http://minio-service.esp-cluster.svc.cluster.local:9000
+    bucket: firmware
+    # TODO add a secret for the access key and secret
+    accessKeyId: ""
+    secretAccessKey: ""
+
+grafana:
+  fullnameOverride: grafana
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+  # Initial admin/password
+  admin:
+    user: admin
+    password: admin
+  datasources:
+    secretName: grafana-datasources
+  grafana:
+    extraEnvVars:
+      - name: INFLUXDB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: influxdb-auth
+            key: admin-password
+      - name: INFLUXDB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: influxdb-auth
+            key: admin-token
+
+influxdb:
+  fullnameOverride: influxdb
+  adminUser:
+    organization: "influxdata"
+    bucket: "default"
+    user: "admin"
+    password: adminadmin
+    token: tokentoken
+
+telegraf:
+  fullnameOverride: telegraf
+  tplVersion: 2
+  # ! use envFromSecret
+  # ? https://github.com/influxdata/telegraf/blob/release-1.31/docs/CONFIGURATION.md#secret-store-secrets
+  # TODO also set configuration e.g. organization, bucket, url through a dedicated configmap
+  env:
+    - name: INFLUXDB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: influxdb-auth
+          key: admin-token
+    # TODO create a dedicated user and secret for connecting to MQTT - read access
+    - name: MQTT_USER
+      valueFrom:
+        secretKeyRef:
+          name: esp-cluster-default-user
+          key: username
+    - name: MQTT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: esp-cluster-default-user
+          key: password
+  config:
+    agent:
+      interval: "1s"
+      round_interval: true
+      metric_batch_size: 1000
+      metric_buffer_limit: 10000
+      collection_jitter: "0s"
+      flush_interval: "10s"
+      flush_jitter: "0s"
+      precision: ""
+      debug: false
+      quiet: false
+      logfile: ""
+      hostname: "$HOSTNAME"
+      omit_hostname: false
+    inputs:
+      - statsd: # TODO I do not want this input
+          service_address: ":8125"
+          percentiles:
+            - 50
+            - 95
+            - 99
+          metric_separator: "_"
+          allowed_pending_messages: 10000
+          percentile_limit: 1000
+      - mqtt_consumer:
+          servers:
+            # TODO in configmap
+            - "tcp://esp-cluster:1883"
+          username: "${MQTT_USER}"
+          password: "${MQTT_PASSWORD}"
+          topics:
+            - "esp-queue/+/coordinates"
+          data_format: "json_v2" # TODO https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
+          # data_format: "json"
+          json_v2:
+            - measurement_name: coordinates
+              object:
+                - path: "@this"
+                  field:
+                    - path: "latitude"
+                      rename: "latitude"
+                    - path: longitude
+                      rename: longitude
+
+          topic_parsing:
+            - topic: "esp-queue/+/coordinates"
+              # measurement: "_/_/measurement"
+              tags: "_/device/_"
+              #fields: "_/_/_"
+              # types:
+              #   device: string
+
+    outputs:
+      - influxdb_v2:
+          # TODO in configmap
+          urls:
+            - "http://influxdb"
+          token: tokentoken # "${INFLUXDB_TOKEN}"
+          organization: "influxdata"
+          bucket: "default"

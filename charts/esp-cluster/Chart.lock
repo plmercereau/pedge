@@ -1,0 +1,12 @@
+dependencies:
+- name: grafana
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 11.3.3
+- name: influxdb2
+  repository: https://helm.influxdata.com
+  version: 2.1.2
+- name: telegraf
+  repository: https://helm.influxdata.com
+  version: 1.8.49
+digest: sha256:46c13e23be451cf6e912df101475340198ce7b98a424d236f07a68205c7bd81e
+generated: "2024-06-16T16:17:39.5038+02:00"

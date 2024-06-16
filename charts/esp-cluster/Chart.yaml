@@ -3,3 +3,14 @@ name: esp-cluster
 description: A Helm chart for managing a cluster of ESP32 devices
 type: application
 version: 0.1.0
+dependencies:
+  - name: grafana
+    version: 11.3.3
+    repository: oci://registry-1.docker.io/bitnamicharts
+  - name: influxdb2
+    alias: influxdb
+    version: 2.1.2
+    repository: https://helm.influxdata.com
+  - name: telegraf
+    version: 1.8.49
+    repository: https://helm.influxdata.com
