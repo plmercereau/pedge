@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "build-and-upload-firmware-{{.Release.Name }}"
+spec:
+  template:
+    metadata:
+      annotations:
+        checksum/values: "{{ include "checksum" . }}"
+    spec:
+      initContainers:
+        - name: build-firmware
+          # TODO use bitnami common template e.g. https://github.com/bitnami/charts/blob/e2e5d5f7ff623382dfabe527a6517069fcdae56d/bitnami/minio/templates/standalone/deployment.yaml#L81
+          image: "{{ .Values.firmware.builder.image.registry }}/{{ .Values.firmware.builder.image.repository }}:{{ $.Values.firmware.builder.image.tag }}"
+          imagePullPolicy: "{{ .Values.firmware.builder.image.pullPolicy }}"
+          volumeMounts:
+            - name: firmware
+              mountPath: /firmware
+          env:
+            - name: GSM_PIN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-user-credentials"
+                  key: gsm_pin
+            - name: MQTT_BROKER
+              value: "{{ .Values.cluster.host }}"
+            - name: MQTT_PORT
+              value: "{{ (printf "%v" .Values.cluster.port) }}"
+            - name: DEVICE_NAME
+              value: "{{ .Release.Name }}"
+            - name: MQTT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name}}-user-credentials"
+                  key: password
+      containers:
+        - name: upload-firmware
+          image: amazon/aws-cli:2.16.6
+          command: ["sh", "-c", "ls"]
+          # TODO implement
+          # command: ["sh", "-c", "aws s3 cp /firmware/firmware.bin s3://{{ $.Values.firmware.storage.bucket }}/{{ .name }}.bin"]
+          env:
+            - name: AWS_ENDPOINT_URL_S3
+              value: "{{ .Values.firmware.storage.endpoint }}"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: firmware-storage-credentials
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: firmware-storage-credentials
+                  key: secret-access-key
+          volumeMounts:
+            - name: firmware
+              mountPath: /firmware
+      restartPolicy: Never
+      volumes:
+        - name: firmware
+          emptyDir: {}
+  backoffLimit: 4

@@ -131,7 +131,25 @@
                   mqttui # MQTT client, for testing purpose
                   platformio-core
                   ngrok
+                  # operator-sdk # package not working
+                  kustomize
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
+                  (
+                    # TODO not working for other architectures...
+                    pkgs.stdenv.mkDerivation {
+                      name = "operator-sdk";
+                      src = pkgs.fetchurl {
+                        url = "https://github.com/operator-framework/operator-sdk/releases/download/v1.34.2/operator-sdk_darwin_arm64";
+                        sha256 = "sha256-NvMvZ80YQsNwDLq6KGxC0tEWt3GiM2Y1YJjBjxChJz0=";
+                      };
+                      phases = ["installPhase" "patchPhase"];
+                      installPhase = ''
+                        mkdir -p $out/bin
+                        cp $src $out/bin/operator-sdk
+                        chmod +x $out/bin/operator-sdk
+                      '';
+                    }
+                  )
                 ];
               }
             ];

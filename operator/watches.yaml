@@ -1,0 +1,10 @@
+# Use the 'create api' subcommand to add watches to this file.
+- group: devices.pedge.io
+  version: v1alpha1
+  kind: Nginx
+  chart: helm-charts/nginx
+- group: devices.pedge.io
+  version: v1alpha1
+  kind: Device
+  chart: helm-charts/device
+#+kubebuilder:scaffold:watch

@@ -7,11 +7,7 @@ SLEEP=0.5
 while true;
 do
 RANDOM_NUMBER=$(( ( RANDOM % 15 ) + 1 ))
-# mqttui -b mqtt://localhost -u $USER \
-#     --password "$PASSWORD" \
-#     publish esp-queue/brussels/coordinates \
-#     $RANDOM_NUMBER
-# sleep $SLEEP
+
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
     publish esp-queue/brussels/coordinates \
@@ -36,10 +32,5 @@ mqttui -b mqtt://localhost -u $USER \
     '{ "latitude": 48.964716, "longitude": 2.349014 }'
 sleep $SLEEP
 
-# mqttui -b mqtt://localhost -u $USER \
-#     --password "$PASSWORD" \
-#     publish esp-queue/test/coordinates \
-#     '{ "coordinates": 10.0 }'
-# sleep 1
 echo "loop"
 done
