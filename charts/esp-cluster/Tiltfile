@@ -29,6 +29,10 @@ k8s_yaml(helm('.', namespace='esp-cluster', values=['./values.yaml']))
 #     flags = ['--values=./values.yaml', '--create-namespace'],
 #     resource_deps = [ 'rabbitmq-cluster-operator'])
 
-docker_build('pedge.io/devices-operator:v0.0.1', '../../operator')
+# docker_build('pedge.io/devices-operator:v0.0.1', '../../operator')
+
+# k8s_yaml(kustomize ( '../../operator/config/default'))
+
+docker_build('pedge.io/devices-operator:0.0.1', '../../operator')
 
 k8s_yaml(kustomize ( '../../operator/config/default'))

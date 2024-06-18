@@ -4,24 +4,41 @@
 # More info: https://book.kubebuilder.io/reference/project-config.html
 domain: pedge.io
 layout:
-- helm.sdk.operatorframework.io/v1
+  - go.kubebuilder.io/v4
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: operator
+projectName: pedge-devices-operator
+repo: github.com/example/memcached-operator
 resources:
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: pedge.io
-  group: devices
-  kind: Nginx
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: pedge.io
-  group: devices
-  kind: Device
-  version: v1alpha1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: pedge.io
+    group: devices
+    kind: Device
+    path: github.com/example/memcached-operator/api/v1alpha1
+    version: v1alpha1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: pedge.io
+    group: devices
+    kind: MQTTServer
+    path: github.com/example/memcached-operator/api/v1alpha1
+    version: v1alpha1
+    webhooks:
+      defaulting: true
+      webhookVersion: v1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: pedge.io
+    group: devices
+    kind: Firmware
+    path: github.com/example/memcached-operator/api/v1alpha1
+    version: v1alpha1
 version: "3"

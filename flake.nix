@@ -125,6 +125,7 @@
             modules = [
               {
                 packages = with pkgs; [
+                  # go_1_21 # * See https://github.com/operator-framework/operator-sdk/issues/6681
                   go
                   kubectl
                   tilt

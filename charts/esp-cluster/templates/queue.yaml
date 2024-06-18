@@ -1,9 +1,0 @@
-apiVersion: rabbitmq.com/v1beta1
-kind: Queue
-metadata:
-  name: {{ .Values.cluster.name }}
-spec:
-  name: {{ .Values.queue.name }} 
-  rabbitmqClusterReference:
-    name: {{ .Values.cluster.name }}
-

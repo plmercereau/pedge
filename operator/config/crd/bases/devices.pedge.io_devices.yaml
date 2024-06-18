@@ -2,6 +2,8 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
   name: devices.devices.pedge.io
 spec:
   group: devices.pedge.io
@@ -30,13 +32,24 @@ spec:
           metadata:
             type: object
           spec:
-            description: Spec defines the desired state of Device
+            description: DeviceSpec defines the desired state of Device
+            properties:
+              firmwareReference:
+                properties:
+                  name:
+                    type: string
+                type: object
+              mqttServerReference:
+                properties:
+                  name:
+                    type: string
+                type: object
+            required:
+            - mqttServerReference
             type: object
-            x-kubernetes-preserve-unknown-fields: true
           status:
-            description: Status defines the observed state of Device
+            description: DeviceStatus defines the observed state of Device
             type: object
-            x-kubernetes-preserve-unknown-fields: true
         type: object
     served: true
     storage: true

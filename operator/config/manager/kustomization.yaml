@@ -5,4 +5,4 @@ kind: Kustomization
 images:
   - name: controller
     newName: pedge.io/devices-operator
-    newTag: v0.0.1
+    newTag: 0.0.1

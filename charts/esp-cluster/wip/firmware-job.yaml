@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: firmware-storage-credentials
+type: Opaque
+data:
+  access-key-id: "{{ .Values.firmware.storage.accessKeyId | b64enc }}"
+  secret-access-key: "{{ .Values.firmware.storage.secretAccessKey | b64enc }}"

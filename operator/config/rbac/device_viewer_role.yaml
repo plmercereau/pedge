@@ -6,22 +6,22 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/instance: device-viewer-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: operator
-    app.kubernetes.io/part-of: operator
+    app.kubernetes.io/created-by: pedge-devices-operator
+    app.kubernetes.io/part-of: pedge-devices-operator
     app.kubernetes.io/managed-by: kustomize
   name: device-viewer-role
 rules:
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - devices
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - devices/status
-  verbs:
-  - get
+  - apiGroups:
+      - devices.pedge.io
+    resources:
+      - devices
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - devices.pedge.io
+    resources:
+      - devices/status
+    verbs:
+      - get
