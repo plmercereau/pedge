@@ -58,9 +58,9 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(devicesv1alpha1.AddToScheme(scheme))
-	rabbitmqtopologyv1.AddToScheme(scheme)
-	rabbitmqv1.AddToScheme(scheme)
-	miniov2.AddToScheme(scheme)
+	utilruntime.Must(rabbitmqtopologyv1.AddToScheme(scheme))
+	utilruntime.Must(rabbitmqv1.AddToScheme(scheme))
+	utilruntime.Must(miniov2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -117,6 +117,7 @@ func main() {
 		setupLog.Error(err, "Could not find CRDs of the RabbitMQ Operator. Please install the operator before running this operator.")
 		os.Exit(1)
 	}
+	// TODO check CRDs: minio, cert-manager, etc
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,

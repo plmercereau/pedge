@@ -6,10 +6,20 @@
 - configure influxdb/grafana
   - Grafana map
 - develop a rancher UI interface
+
   - CRUD devices
   - firmware build status
   - download firmwares
   - installation script (if possible)
+
+- OperatorHub / OLM
+  - [x] cert-manager
+  - [x] rabbitmq
+  - [x] rabbitmq message topology
+  - [x] grafana
+  - [ ] influxdb2
+  - [ ] telegraf
+  - [x] minio
 
 ## Next
 
