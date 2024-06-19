@@ -45,6 +45,8 @@ import (
 	//+kubebuilder:scaffold:imports
 	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
+	miniov2 "github.com/minio/operator/pkg/apis/minio.min.io/v2"
+
 )
 
 var (
@@ -58,6 +60,7 @@ func init() {
 	utilruntime.Must(devicesv1alpha1.AddToScheme(scheme))
 	rabbitmqtopologyv1.AddToScheme(scheme)
 	rabbitmqv1.AddToScheme(scheme)
+	miniov2.AddToScheme(scheme)
 	//+kubebuilder:scaffold:scheme
 }
 

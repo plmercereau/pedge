@@ -2,8 +2,8 @@ package controller
 
 import (
 	"crypto/rand"
+	"math/big"
 	"crypto/sha256"
-	"encoding/base64"
     "encoding/hex"
 )
 
@@ -30,9 +30,15 @@ func removeString(slice []string, s string) []string {
 }
 
 func generateRandomPassword(length int) string {
-	bytes := make([]byte, length)
-	rand.Read(bytes)
-	return base64.URLEncoding.EncodeToString(bytes)[:length]
+    const charset = "abcdefghijklmnopqrstuvwxyz" +
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" 
+		// ! c macro interpolation does not support some characters in !@#$%^&*()-_=+[]{}|;:,.<>?/~"
+    password := make([]byte, length)
+    for i := range password {
+        randomIndex, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+        password[i] = charset[randomIndex.Int64()]
+    }
+    return string(password)
 }
 
 func computeSHA256(data []byte) string {

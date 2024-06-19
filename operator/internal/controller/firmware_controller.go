@@ -32,7 +32,7 @@ func (r *FirmwareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if client.IgnoreNotFound(err) == nil {
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "unable to fetch Firmware")
+		logger.Error(err, "Uunable to fetch Firmware")
 		return ctrl.Result{}, err
 	}
 

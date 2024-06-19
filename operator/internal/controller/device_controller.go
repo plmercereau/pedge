@@ -11,6 +11,7 @@ firmwareReference:
 */
 import (
 	"context"
+	"fmt"
 
     rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
     batchv1 "k8s.io/api/batch/v1"
@@ -158,6 +159,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 			Data: map[string][]byte{
 				"username": []byte(device.Name), 
 				"password": []byte(generateRandomPassword(16)),
+				"gsm_pin":  []byte(""),
 			},
 		}
 		// Set the ownerRef for the secret to ensure it gets cleaned up when the device is deleted
@@ -166,15 +168,24 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 		// }
 		
 		if err := r.Create(ctx, &secret); err != nil {
-			logger.Error(err, "unable to create secret " + secretName)
+			logger.Error(err, "Unable to create secret " + secretName)
 			return err
 		}
     } else {
+		changed := false
+		if (secret.Data["gsm_pin"] == nil) {
+			secret.Data["gsm_pin"] = []byte("")
+			changed = true
+		}
+		username := string(secret.Data["username"])
 		if string(secret.Data["username"]) != device.Name {
-			logger.Info("Updating username in secret " + secretName)
+			logger.Info("Mismatching username in " + secretName + ". Expected " + device.Name + " but found " + username + ". Overriding the value")
 			secret.Data["username"] = []byte(device.Name)
+			changed = true
+		}
+		if changed {
 			if err := r.Update(ctx, &secret); err != nil {
-				logger.Error(err, "unable to update secret " + secretName)
+				logger.Error(err, "Unable to update secret " + secretName)
 				return err
 			}
 		}
@@ -245,8 +256,8 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 			},
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
-				Write:    "^" + mqttServer.Spec.Queue.Name + "\\." + device.Name + "\\..+$",
-				Read:     "^" + mqttServer.Spec.Queue.Name + "\\." + device.Name + "\\..+$",
+				Write:    fmt.Sprintf("^%s\\.%s\\..+$", mqttServer.Spec.Queue.Name, device.Name),
+				Read:     fmt.Sprintf("^%s\\.%s\\..+$", mqttServer.Spec.Queue.Name, device.Name),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
 				Name: mqttServer.Name,
@@ -284,7 +295,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 							InitContainers: []corev1.Container{
 								{
 									Name:            "build-firmware",
-									Image:           builderImage.Registry + "/" + builderImage.Repository + ":" + builderImage.Tag,
+									Image:           fmt.Sprintf("%s/%s:%s", builderImage.Registry, builderImage.Repository, builderImage.Tag),
 									ImagePullPolicy: corev1.PullPolicy(builderImage.PullPolicy),
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -295,15 +306,14 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 									Env: []corev1.EnvVar{
 										{
 											Name: "GSM_PIN",
-											Value: "1234", // TODO
-											// ValueFrom: &corev1.EnvVarSource{
-											// 	SecretKeyRef: &corev1.SecretKeySelector{
-											// 		LocalObjectReference: corev1.LocalObjectReference{
-											// 			Name: device.Name + "-user-credentials",
-											// 		},
-											// 		Key: "gsm_pin",
-											// 	},
-											// },
+											ValueFrom: &corev1.EnvVarSource{
+												SecretKeyRef: &corev1.SecretKeySelector{
+													LocalObjectReference: corev1.LocalObjectReference{
+														Name: secretName,
+													},
+													Key: "gsm_pin",
+												},
+											},
 										},
 										{
 											Name:  "MQTT_BROKER",
@@ -335,36 +345,37 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 								{
 									Name:    "upload-firmware",
 									Image:   "amazon/aws-cli:2.16.6",
-									Command: []string{"sh", "-c", "ls"},
-									// TODO ["sh", "-c", "aws s3 cp /firmware/firmware.bin s3://{{ $.Values.firmware.storage.bucket }}/{{ .name }}.bin"]
+									Command: []string{"sh", "-c", fmt.Sprintf("aws --no-verify-ssl s3 cp /firmware/firmware.bin s3://%s/%s.bin", bucketName, device.Name)},
 									Env: []corev1.EnvVar{
 										{
 											Name:  "AWS_ENDPOINT_URL_S3",
-											Value: "TODO", // TODO
+											Value: fmt.Sprintf("https://minio.%s.svc.cluster.local", mqttServer.Namespace),
+										},
+										{
+											Name: "AWS_DEFAULT_REGION",
+											Value: bucketRegion,
 										},
 										{
 										    Name: "AWS_ACCESS_KEY_ID",
-											Value: "TODO", // TODO
-										    // ValueFrom: &corev1.EnvVarSource{
-										    //     SecretKeyRef: &corev1.SecretKeySelector{
-										    //         LocalObjectReference: corev1.LocalObjectReference{
-										    //             Name: "firmware-storage-credentials",
-										    //         },
-										    //         Key: "access-key-id",
-										    //     },
-										    // },
+										    ValueFrom: &corev1.EnvVarSource{
+										        SecretKeyRef: &corev1.SecretKeySelector{
+										            LocalObjectReference: corev1.LocalObjectReference{
+										                Name: mqttServer.Name + deviceClusterSecretSuffix,
+										            },
+										            Key: s3AccessKeyId,
+										        },
+										    },
 										},
 										{
 										    Name: "AWS_SECRET_ACCESS_KEY",
-											Value: "TODO", // TODO
-										    // ValueFrom: &corev1.EnvVarSource{
-										    //     SecretKeyRef: &corev1.SecretKeySelector{
-										    //         LocalObjectReference: corev1.LocalObjectReference{
-										    //             Name: "firmware-storage-credentials",
-										    //         },
-										    //         Key: "secret-access-key",
-										    //     },
-										    // },
+										    ValueFrom: &corev1.EnvVarSource{
+										        SecretKeyRef: &corev1.SecretKeySelector{
+										            LocalObjectReference: corev1.LocalObjectReference{
+														Name: mqttServer.Name + deviceClusterSecretSuffix,
+										            },
+										            Key: s3SecretAccessKey,
+										        },
+										    },
 										},
 									},
 									VolumeMounts: []corev1.VolumeMount{
@@ -375,7 +386,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 									},
 								},
 							},
-							RestartPolicy: corev1.RestartPolicyNever,
+							RestartPolicy: corev1.RestartPolicyOnFailure,
 							Volumes: []corev1.Volume{
 								{
 									Name: "firmware",
@@ -416,8 +427,23 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 		}
 		return err
 	}
-	obj.SetResourceVersion(existing.GetResourceVersion())
-	return r.Update(ctx, obj)
+	for i := 0; i < 5; i++ { // Retry up to 5 times
+		obj.SetResourceVersion(existing.GetResourceVersion())
+		err = r.Update(ctx, obj)
+		if err == nil {
+			return nil
+		}
+		if errors.IsConflict(err) {
+			// Fetch the latest version of the object
+			err = r.Get(ctx, key, existing)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return fmt.Errorf("failed to update resource %s/%s after multiple attempts: %w", obj.GetNamespace(), obj.GetName(), err)
 }
 
 // * https://book.kubebuilder.io/reference/watching-resources/externally-managed

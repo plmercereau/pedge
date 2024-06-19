@@ -2,17 +2,6 @@
 
   - Rename "MQTTServer" to "DeviceCluster"
     - endpoint: get information from loadbalancer
-  - Device secrets: rabbitmq username/password + PIN
-  - firmware job
-
-    - firmware:
-      storage: # TODO
-      endpoint: http://minio-service.esp-cluster.svc.cluster.local:9000
-      bucket: firmware # TODO add a secret for the access key and secret
-      accessKeyId: ""
-      secretAccessKey: ""
-
-  - store the firmware to an S3 bucket
 
 - configure influxdb/grafana
   - Grafana map
