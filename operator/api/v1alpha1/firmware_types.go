@@ -5,15 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TODO
-// storage:
-//     # TODO
-//     endpoint: http://minio-service.esp-cluster.svc.cluster.local:9000
-//     bucket: firmware
-//     # TODO add a secret for the access key and secret
-//     accessKeyId: ""
-//     secretAccessKey: ""
-
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 type FirmwareBuilderImage struct {

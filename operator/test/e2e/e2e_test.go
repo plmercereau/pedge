@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/example/memcached-operator/test/utils"
+	"github.com/plmercereau/pedge/test/utils"
 )
 
 const namespace = "pedge-devices-operator-system"

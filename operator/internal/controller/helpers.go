@@ -2,8 +2,6 @@ package controller
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"math/big"
 )
 
@@ -39,9 +37,4 @@ func generateRandomPassword(length int) string {
 		password[i] = charset[randomIndex.Int64()]
 	}
 	return string(password)
-}
-
-func computeSHA256(data []byte) string {
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
 }

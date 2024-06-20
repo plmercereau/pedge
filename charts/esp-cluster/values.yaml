@@ -1,4 +1,5 @@
 grafana:
+  enabled: true
   fullnameOverride: grafana
   ingress:
     enabled: true
@@ -23,6 +24,7 @@ grafana:
             key: admin-token
 
 influxdb:
+  enabled: true
   fullnameOverride: influxdb
   adminUser:
     organization: "influxdata"
@@ -32,6 +34,7 @@ influxdb:
     token: tokentoken
 
 telegraf:
+  enabled: true
   fullnameOverride: telegraf
   tplVersion: 2
   # ! use envFromSecret

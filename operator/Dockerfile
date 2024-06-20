@@ -12,7 +12,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/ cmd/
 COPY api/ api/
-# TODO move internal/controller to controllers
+# ? move internal/controller to controllers ?
 # COPY controllers/ controllers/
 COPY internal/controller/ internal/controller/
 

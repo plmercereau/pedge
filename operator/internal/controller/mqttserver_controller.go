@@ -8,6 +8,7 @@ import (
 	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
 
+	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -17,8 +18,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	// TODO change this
-	devicesv1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
 )
 
 const s3AccessKeyId = "accesskey"     // ! cannot be changed - depends on the MinIO operator
@@ -45,7 +44,7 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger := log.FromContext(ctx)
 
 	// Fetch the MQTTServer instance
-	server := &devicesv1alpha1.MQTTServer{}
+	server := &pedgev1alpha1.MQTTServer{}
 	err := r.Get(ctx, req.NamespacedName, server)
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
@@ -57,7 +56,7 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Secret
 	secretName := server.Name + deviceClusterSecretSuffix
-	// TODO decidated user
+	// TODO decidated minio user, and dedicated rabbitmq/mqtt "listener" user
 	// * see https://github.com/minio/operator/blob/master/examples/kustomization/base/storage-user.yaml
 	// * and https://github.com/minio/operator/blob/fd7ede7ba9b5e0c4730284afff84c1350933f848/examples/kustomization/base/tenant.yaml#L33
 	var secret corev1.Secret
@@ -86,7 +85,7 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 	} else {
-		// TODO watch the secret for changes
+		// TODO watch the secret for changes - see the logic in the Device controller
 		changed := false
 		s3Key := string(secret.Data[s3AccessKeyId])
 		if s3Key == "" {
@@ -104,9 +103,8 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		configEnv := fmt.Sprintf("export MINIO_ROOT_USER=%s\nexport MINIO_ROOT_PASSWORD=%s", s3Key, s3Secret)
 		if string(secret.Data["config.env"]) != configEnv {
-			logger.Info("Updating config.env value for in secret " + secretName)
+			logger.Info("Update config.env value for in secret " + secretName)
 			secret.Data["config.env"] = []byte(configEnv)
-			logger.Info("Updated " + secretName) // TODO remove
 			changed = true
 		}
 		if changed {
@@ -152,7 +150,7 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // finalizeMQTTServer handles cleanup logic when a MQTTServer is deleted
-func (r *MQTTServerReconciler) finalizeMQTTServer(ctx context.Context, server *devicesv1alpha1.MQTTServer) error {
+func (r *MQTTServerReconciler) finalizeMQTTServer(ctx context.Context, server *pedgev1alpha1.MQTTServer) error {
 	resources := []client.Object{
 		&rabbitmqv1.RabbitmqCluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -183,19 +181,19 @@ func (r *MQTTServerReconciler) finalizeMQTTServer(ctx context.Context, server *d
 }
 
 // syncResources creates or updates the associated resources
-func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *devicesv1alpha1.MQTTServer) error {
+func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *pedgev1alpha1.MQTTServer) error {
 	// Define the desired RabbitMQ Cluster resource
 	cluster := &rabbitmqv1.RabbitmqCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name,
 			Namespace: server.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, devicesv1alpha1.GroupVersion.WithKind("MQTTServer")),
+				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("MQTTServer")),
 			},
 		},
 		Spec: rabbitmqv1.RabbitmqClusterSpec{
 			Service: rabbitmqv1.RabbitmqClusterServiceSpec{
-				Type: "LoadBalancer", // TODO
+				Type: "LoadBalancer",
 			},
 			Rabbitmq: rabbitmqv1.RabbitmqClusterConfigurationSpec{
 				AdditionalPlugins: []rabbitmqv1.Plugin{"rabbitmq_mqtt"},
@@ -208,7 +206,7 @@ func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *device
 			Name:      server.Name,
 			Namespace: server.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, devicesv1alpha1.GroupVersion.WithKind("MQTTServer")),
+				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("MQTTServer")),
 			},
 		},
 		Spec: rabbitmqtopologyv1.QueueSpec{
@@ -227,14 +225,14 @@ func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *device
 			Name:      server.Name,
 			Namespace: server.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, devicesv1alpha1.GroupVersion.WithKind("MQTTServer")),
+				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("MQTTServer")),
 			},
 		},
 		Spec: miniov2.TenantSpec{
 			Pools: []miniov2.Pool{
 				{
 					Name:             "minio-pool-default",
-					Servers:          4, // TODO may be a bit too much
+					Servers:          4, // TODO may be a bit too much, try a lower value
 					VolumesPerServer: 4,
 					VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
@@ -308,6 +306,6 @@ func (r *MQTTServerReconciler) CreateOrUpdate(ctx context.Context, obj client.Ob
 // SetupWithManager sets up the controller with the Manager
 func (r *MQTTServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&devicesv1alpha1.MQTTServer{}).
+		For(&pedgev1alpha1.MQTTServer{}).
 		Complete(r)
 }

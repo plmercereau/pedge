@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	devicesv1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
+	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 )
 
 var _ = Describe("MQTTServer Controller", func() {
@@ -40,13 +40,13 @@ var _ = Describe("MQTTServer Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		mqttserver := &devicesv1alpha1.MQTTServer{}
+		mqttserver := &pedgev1alpha1.MQTTServer{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind MQTTServer")
 			err := k8sClient.Get(ctx, typeNamespacedName, mqttserver)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &devicesv1alpha1.MQTTServer{
+				resource := &pedgev1alpha1.MQTTServer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("MQTTServer Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &devicesv1alpha1.MQTTServer{}
+			resource := &pedgev1alpha1.MQTTServer{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 

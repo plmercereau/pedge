@@ -1,4 +1,4 @@
-module github.com/example/memcached-operator
+module github.com/plmercereau/pedge
 
 go 1.21.8
 

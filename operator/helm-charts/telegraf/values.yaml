@@ -3,14 +3,12 @@ telegraf:
   tplVersion: 2
   # ! use envFromSecret
   # ? https://github.com/influxdata/telegraf/blob/release-1.31/docs/CONFIGURATION.md#secret-store-secrets
-  # TODO also set configuration e.g. organization, bucket, url through a dedicated configmap
   env:
     - name: INFLUXDB_TOKEN
       valueFrom:
         secretKeyRef:
           name: influxdb-auth
           key: admin-token
-    # TODO create a dedicated user and secret for connecting to MQTT - read access
     - name: MQTT_USER
       valueFrom:
         secretKeyRef:
@@ -37,7 +35,7 @@ telegraf:
       hostname: "$HOSTNAME"
       omit_hostname: false
     inputs:
-      - statsd: # TODO I do not want this input
+      - statsd:
           service_address: ":8125"
           percentiles:
             - 50
@@ -48,13 +46,12 @@ telegraf:
           percentile_limit: 1000
       - mqtt_consumer:
           servers:
-            # TODO in configmap
             - "tcp://esp-cluster:1883"
           username: "${MQTT_USER}"
           password: "${MQTT_PASSWORD}"
           topics:
             - "esp-queue/+/coordinates"
-          data_format: "json_v2" # TODO https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
+          data_format: "json_v2"
           # data_format: "json"
           json_v2:
             - measurement_name: coordinates
@@ -76,7 +73,6 @@ telegraf:
 
     outputs:
       - influxdb_v2:
-          # TODO in configmap
           urls:
             - "http://influxdb"
           token: tokentoken # "${INFLUXDB_TOKEN}"

@@ -1,15 +1,5 @@
 package controller
 
-/*
-TODO
-network: # TODO network.type: gsm
-  gsm:
-    pin: 1234
-
-firmwareReference:
-  name: xxx
-
-*/
 import (
 	"context"
 	"fmt"
@@ -20,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,10 +19,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	// "sigs.k8s.io/controller-runtime/pkg/source"
+	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	// TODO change this
-	devicesv1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
+)
+
+const (
+	// TODO try change the suffix now that we are "managing" the secret, and as the rabbitmq operator takes ownership of it
+	deviceSecretSuffix        = "-user-credentials"
+	secretNameLabel           = "pedge.io/secret-name"
+	secretVersionAnnotation   = "pedge.io/secret-version"
+	firmwareVersionAnnotation = "pedge.io/firmware-version"
 )
 
 // DeviceReconciler reconciles a Device object
@@ -42,7 +40,6 @@ type DeviceReconciler struct {
 
 //+kubebuilder:rbac:groups=devices.pedge.io,resources=devices,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=devices.pedge.io,resources=devices/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=devices/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rabbitmq.com,resources=permissions;topicpermissions;users,verbs=get;list;watch;create;update;patch;delete
@@ -50,9 +47,9 @@ type DeviceReconciler struct {
 
 func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-
+	logger.Info("Reconciling Device")
 	// Fetch the Device instance
-	device := &devicesv1alpha1.Device{}
+	device := &pedgev1alpha1.Device{}
 	err := r.Get(ctx, req.NamespacedName, device)
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
@@ -61,11 +58,11 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		logger.Error(err, "unable to fetch device")
 		return ctrl.Result{}, err
 	}
-
+	logger.Info("Fetched device " + device.Name)
 	// Fetch the referenced Firmware instance
-	var firmware *devicesv1alpha1.Firmware
-	if device.Spec.FirmwareReference != (devicesv1alpha1.FirmwareReference{}) {
-		firmware = &devicesv1alpha1.Firmware{}
+	var firmware *pedgev1alpha1.Firmware
+	if device.Spec.FirmwareReference != (pedgev1alpha1.FirmwareReference{}) {
+		firmware = &pedgev1alpha1.Firmware{}
 		err := r.Get(ctx, types.NamespacedName{Name: device.Spec.FirmwareReference.Name, Namespace: device.Namespace}, firmware)
 		if err != nil {
 			logger.Error(err, "unable to fetch firmware")
@@ -73,32 +70,8 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	// Check if the Device is marked for deletion
-	if device.GetDeletionTimestamp() != nil {
-		if containsString(device.GetFinalizers(), deviceFinalizer) {
-			// Finalize the device
-			if err := r.finalizeDevice(ctx, device); err != nil {
-				return ctrl.Result{}, err
-			}
-			// Remove finalizer
-			device.SetFinalizers(removeString(device.GetFinalizers(), deviceFinalizer))
-			if err := r.Update(ctx, device); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
-
-	// Add finalizer for this CR
-	if !containsString(device.GetFinalizers(), deviceFinalizer) {
-		device.SetFinalizers(append(device.GetFinalizers(), deviceFinalizer))
-		if err := r.Update(ctx, device); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
-	var mqttServer *devicesv1alpha1.MQTTServer
-	mqttServer = &devicesv1alpha1.MQTTServer{}
+	var mqttServer *pedgev1alpha1.MQTTServer
+	mqttServer = &pedgev1alpha1.MQTTServer{}
 	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.MQTTServerReference.Name, Namespace: device.Namespace}, mqttServer); err != nil {
 		logger.Error(err, "unable to fetch MQTTServer")
 		return ctrl.Result{}, err
@@ -112,44 +85,14 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-// finalizeDevice handles cleanup logic when a Device is deleted
-func (r *DeviceReconciler) finalizeDevice(ctx context.Context, device *devicesv1alpha1.Device) error {
-	resources := []client.Object{
-		&rabbitmqtopologyv1.User{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      device.Name,
-				Namespace: device.Namespace,
-			},
-		},
-		&rabbitmqtopologyv1.Permission{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      device.Name,
-				Namespace: device.Namespace,
-			},
-		},
-		&rabbitmqtopologyv1.TopicPermission{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      device.Name,
-				Namespace: device.Namespace,
-			},
-		},
-	}
-
-	for _, res := range resources {
-		if err := r.Delete(ctx, res); client.IgnoreNotFound(err) != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // syncResources creates or updates the associated resources
-func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1alpha1.Device, firmware *devicesv1alpha1.Firmware, mqttServer *devicesv1alpha1.MQTTServer) error {
+func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alpha1.Device, firmware *pedgev1alpha1.Firmware, mqttServer *pedgev1alpha1.MQTTServer) error {
 	logger := log.FromContext(ctx)
 
 	// Secret
-	secretName := device.Name + "-user-credentials"
+	secretName := device.Name + deviceSecretSuffix
 	var secret corev1.Secret
+	var secretVersion string
 	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: device.Namespace}, &secret); err != nil {
 		logger.Info("Creating new secret " + secretName)
 		secret = corev1.Secret{
@@ -191,19 +134,32 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 			}
 		}
 	}
+	secretVersion = secret.ResourceVersion
 
-	// TODO reconciliation error, see https://chatgpt.com/share/0a348d07-9006-4084-8bbf-a4facfbc0d97
+	// Check if labels map is nil
+	if device.Labels == nil {
+		device.Labels = make(map[string]string)
+	}
+
+	// Add the secret name to the device labels
+	device.Labels[secretNameLabel] = secretName
+
+	// Update the Device resource
+	if err := r.Client.Update(ctx, device); err != nil {
+		return err
+	}
+
 	// Define the desired RabbitMQ User resource
 	user := &rabbitmqtopologyv1.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      device.Name,
 			Namespace: device.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(device, devicesv1alpha1.GroupVersion.WithKind("Device")),
+				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
 			},
 			Annotations: map[string]string{
 				// Needed to trigger a reconciliation when the password changes
-				"checksum/password": computeSHA256(secret.Data["password"]),
+				secretVersionAnnotation: secretVersion,
 			},
 		},
 		Spec: rabbitmqtopologyv1.UserSpec{
@@ -222,7 +178,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 			Name:      device.Name,
 			Namespace: device.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(device, devicesv1alpha1.GroupVersion.WithKind("Device")),
+				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
 			},
 		},
 		Spec: rabbitmqtopologyv1.PermissionSpec{
@@ -247,7 +203,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 			Name:      device.Name,
 			Namespace: device.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(device, devicesv1alpha1.GroupVersion.WithKind("Device")),
+				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
 			},
 		},
 		Spec: rabbitmqtopologyv1.TopicPermissionSpec{
@@ -258,7 +214,8 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
 				Write:    fmt.Sprintf("^%s\\.%s\\..+$", mqttServer.Spec.Queue.Name, device.Name),
-				Read:     fmt.Sprintf("^%s\\.%s\\..+$", mqttServer.Spec.Queue.Name, device.Name),
+				// TODO narrow down the read permissions: the device should only be able to write to its own topic
+				Read: fmt.Sprintf("^%s\\.%s\\..+$", mqttServer.Spec.Queue.Name, device.Name),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
 				Name: mqttServer.Name,
@@ -281,17 +238,18 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 					Name:      jobName,
 					Namespace: device.Namespace,
 					OwnerReferences: []metav1.OwnerReference{
-						*metav1.NewControllerRef(device, devicesv1alpha1.GroupVersion.WithKind("Device")),
+						*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
 					},
 				},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
-						// TODO re-trigger the job when the firmware changes
-						// ObjectMeta: metav1.ObjectMeta{
-						//     Annotations: map[string]string{
-						//         "checksum/values": "<checksum_value>",
-						//     },
-						// },
+						// TODO check this: re-trigger the job when the firmware or secret changes. It may mean we need to update the firmware first?
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								firmwareVersionAnnotation: firmware.GetResourceVersion(),
+								secretVersionAnnotation:   secretVersion,
+							},
+						},
 						Spec: corev1.PodSpec{
 							InitContainers: []corev1.Container{
 								{
@@ -450,23 +408,51 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 // * https://book.kubebuilder.io/reference/watching-resources/externally-managed
 func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&devicesv1alpha1.Device{}).
-		Owns(&corev1.Secret{}). // ? do I need to own the Secret?
-		// TODO probably watch MQTTServer, too
+		For(&pedgev1alpha1.Device{}).
+		// TODO Watch MQTTServer, too
 		Watches(
-			// &source.Kind{Type: &devicesv1alpha1.Firmware{}},
-			&devicesv1alpha1.Firmware{},
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&pedgev1alpha1.Firmware{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForFirmware),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Complete(r)
 }
 
-func (r *DeviceReconciler) findObjectsForFirmware(ctx context.Context, device client.Object) []reconcile.Request {
-	attachedDevices := &devicesv1alpha1.DeviceList{}
+func (r *DeviceReconciler) findObjectsForSecret(ctx context.Context, secret client.Object) []reconcile.Request {
+	attachedDevices := &pedgev1alpha1.DeviceList{}
 	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(".spec.firmwareReference.name", device.GetName()),
-		Namespace:     device.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(labels.Set{
+			secretNameLabel: secret.GetName(),
+		}),
+		Namespace: secret.GetNamespace(),
+	}
+	err := r.List(ctx, attachedDevices, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(attachedDevices.Items))
+	for i, item := range attachedDevices.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
+}
+
+func (r *DeviceReconciler) findObjectsForFirmware(ctx context.Context, firmware client.Object) []reconcile.Request {
+	attachedDevices := &pedgev1alpha1.FirmwareList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(".spec.firmwareReference.name", firmware.GetName()),
+		Namespace:     firmware.GetNamespace(),
 	}
 	err := r.List(ctx, attachedDevices, listOps)
 	if err != nil {

@@ -26,8 +26,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
-	devicesv1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
-	"github.com/example/memcached-operator/internal/controller"
+	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
+	"github.com/plmercereau/pedge/internal/controller"
 
 	//+kubebuilder:scaffold:imports
 	miniov2 "github.com/minio/operator/pkg/apis/minio.min.io/v2"
@@ -45,7 +45,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(devicesv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(pedgev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(rabbitmqtopologyv1.AddToScheme(scheme))
 	utilruntime.Must(rabbitmqv1.AddToScheme(scheme))
 	utilruntime.Must(miniov2.AddToScheme(scheme))
