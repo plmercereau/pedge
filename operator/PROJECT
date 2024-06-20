@@ -38,13 +38,4 @@ resources:
     kind: Firmware
     path: github.com/plmercereau/pedge/api/v1alpha1
     version: v1alpha1
-  - api:
-      crdVersion: v1
-      namespaced: true
-    controller: true
-    domain: pedge.io
-    group: devices
-    kind: Telegraf
-    path: github.com/plmercereau/pedge/api/v1alpha1
-    version: v1alpha1
 version: "3"

@@ -5,7 +5,6 @@ resources:
   - bases/devices.pedge.io_devices.yaml
   - bases/devices.pedge.io_mqttservers.yaml
   - bases/devices.pedge.io_firmwares.yaml
-  - bases/devices.pedge.io_telegrafs.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:
