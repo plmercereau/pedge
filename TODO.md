@@ -2,6 +2,8 @@
 
   - Rename "MQTTServer" to "DeviceCluster"
     - endpoint: get information from loadbalancer
+  - Rename "esp\*" to "~mcu~"
+  - move netboot stuff to another repo
   - Integrate telegraf/influxdb2/grafana
     - dedicated chart
     - https://helm.sh/docs/chart_template_guide/yaml_techniques/#yaml-anchors
