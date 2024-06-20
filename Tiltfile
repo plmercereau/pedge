@@ -18,13 +18,18 @@ helm_resource('rabbitmq-cluster-operator',
     flags = ['--version=4.2.10', '--set=useCertManager=true', '--create-namespace'],
     resource_deps = [ 'cert-manager'])
 
+helm_repo('minio', 'https://operator.min.io')
+helm_resource('minio-operator',
+    'minio/operator',
+    namespace='minio-operator',
+    flags = ['--version=5.0.15', '--create-namespace']
+)
+
 # TODO wait for rabbitmq-cluster-operator
 load('ext://namespace', 'namespace_create', 'namespace_inject')
 namespace_create('esp-cluster')
-k8s_yaml(helm('.', namespace='esp-cluster', values=['./values.yaml']))
+k8s_yaml(helm('./charts/esp-cluster', namespace='esp-cluster', values=['./charts/esp-cluster/values.yaml']))
 
-# helm_resource('esp-cluster', # ! does not watch for changes in values.yaml
-#     '.', 
-#     namespace='esp-cluster',
-#     flags = ['--values=./values.yaml', '--create-namespace'],
-#     resource_deps = [ 'rabbitmq-cluster-operator'])
+docker_build('pedge.io/devices-operator:0.0.1', './operator')
+
+k8s_yaml(kustomize ( './operator/config/default'))

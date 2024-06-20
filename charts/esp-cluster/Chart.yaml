@@ -7,10 +7,13 @@ dependencies:
   - name: grafana
     version: 11.3.3
     repository: oci://registry-1.docker.io/bitnamicharts
+    condition: grafana.enabled
   - name: influxdb2
     alias: influxdb
     version: 2.1.2
     repository: https://helm.influxdata.com
+    condition: influxdb.enabled
   - name: telegraf
     version: 1.8.49
     repository: https://helm.influxdata.com
+    condition: telegraf.enabled

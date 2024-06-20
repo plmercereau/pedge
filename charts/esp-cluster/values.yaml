@@ -1,37 +1,5 @@
-# TODO remove the testing values
-# TODO not ideally named - cluster is misleading
-cluster:
-  name: esp-cluster
-  # TODO should not be needed when exposing the service
-  host: 5.tcp.eu.ngrok.io
-  port: 17375
-
-queue:
-  name: esp-queue
-
-devices:
-  - name: test
-    network:
-      gsm:
-        pin: 1234
-
-firmware:
-  builder:
-    image:
-      # TODO use bitnami common template https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_images.tpl
-      registry: plmercereau
-      repository: esp-monitor-builder
-      tag: latest # TODO use the git commit hash
-      pullPolicy: IfNotPresent
-  storage:
-    # TODO
-    endpoint: http://minio-service.esp-cluster.svc.cluster.local:9000
-    bucket: firmware
-    # TODO add a secret for the access key and secret
-    accessKeyId: ""
-    secretAccessKey: ""
-
 grafana:
+  enabled: true
   fullnameOverride: grafana
   ingress:
     enabled: true
@@ -56,6 +24,7 @@ grafana:
             key: admin-token
 
 influxdb:
+  enabled: true
   fullnameOverride: influxdb
   adminUser:
     organization: "influxdata"
@@ -65,6 +34,7 @@ influxdb:
     token: tokentoken
 
 telegraf:
+  enabled: true
   fullnameOverride: telegraf
   tplVersion: 2
   # ! use envFromSecret
