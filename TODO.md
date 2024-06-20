@@ -3,7 +3,7 @@
   - Rename "MQTTServer" to "DeviceCluster"
     - endpoint: get information from loadbalancer
   - Rename "esp\*" to mcu
-  - Rename device to mcu? think about the same system for sbc
+  - Rename device to mcu? think about the same system for sbc. maybe a "type: mcu" field in the crd. then device is ok
   - move netboot stuff to another repo
   - Integrate telegraf/influxdb2/grafana
     - dedicated chart
