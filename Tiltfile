@@ -28,8 +28,8 @@ helm_resource('minio-operator',
 # TODO wait for rabbitmq-cluster-operator
 load('ext://namespace', 'namespace_create', 'namespace_inject')
 namespace_create('esp-cluster')
-k8s_yaml(helm('.', namespace='esp-cluster', values=['./values.yaml']))
+k8s_yaml(helm('./charts/esp-cluster', namespace='esp-cluster', values=['./charts/esp-cluster/values.yaml']))
 
-docker_build('pedge.io/devices-operator:0.0.1', '../../operator')
+docker_build('pedge.io/devices-operator:0.0.1', './operator')
 
-k8s_yaml(kustomize ( '../../operator/config/default'))
+k8s_yaml(kustomize ( './operator/config/default'))
