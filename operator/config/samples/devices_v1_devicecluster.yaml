@@ -1,0 +1,7 @@
+apiVersion: devices.pedge.io/v1
+kind: Telegraf
+metadata:
+  name: telegraf-sample
+spec:
+  {}
+  # Default values copied from <project_dir>/helm-charts/telegraf/values.yaml

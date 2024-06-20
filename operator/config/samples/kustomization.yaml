@@ -1,6 +1,7 @@
 ## Append samples of your project ##
 resources:
-- devices_v1alpha1_device.yaml
-- devices_v1alpha1_mqttserver.yaml
-- devices_v1alpha1_firmware.yaml
+  - devices_v1alpha1_device.yaml
+  - devices_v1alpha1_mqttserver.yaml
+  - devices_v1alpha1_firmware.yaml
+  - devices_v1alpha1_telegraf.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

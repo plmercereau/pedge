@@ -1,11 +1,11 @@
 package v1alpha1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	core "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TODO  
+// TODO
 // storage:
 //     # TODO
 //     endpoint: http://minio-service.esp-cluster.svc.cluster.local:9000
@@ -17,9 +17,9 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 type FirmwareBuilderImage struct {
-	Registry string `json:"registry,omitempty"`
-	Repository string `json:"repository,omitempty"`
-	Tag string `json:"tag,omitempty"`
+	Registry   string          `json:"registry,omitempty"`
+	Repository string          `json:"repository,omitempty"`
+	Tag        string          `json:"tag,omitempty"`
 	PullPolicy core.PullPolicy `json:"pullPolicy,omitempty"`
 }
 

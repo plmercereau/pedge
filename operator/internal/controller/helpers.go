@@ -2,9 +2,9 @@ package controller
 
 import (
 	"crypto/rand"
-	"math/big"
 	"crypto/sha256"
-    "encoding/hex"
+	"encoding/hex"
+	"math/big"
 )
 
 const deviceFinalizer = "devices.pedge.io/finalizer"
@@ -30,18 +30,18 @@ func removeString(slice []string, s string) []string {
 }
 
 func generateRandomPassword(length int) string {
-    const charset = "abcdefghijklmnopqrstuvwxyz" +
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" 
+	const charset = "abcdefghijklmnopqrstuvwxyz" +
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 		// ! c macro interpolation does not support some characters in !@#$%^&*()-_=+[]{}|;:,.<>?/~"
-    password := make([]byte, length)
-    for i := range password {
-        randomIndex, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-        password[i] = charset[randomIndex.Int64()]
-    }
-    return string(password)
+	password := make([]byte, length)
+	for i := range password {
+		randomIndex, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		password[i] = charset[randomIndex.Int64()]
+	}
+	return string(password)
 }
 
 func computeSHA256(data []byte) string {
-    hash := sha256.Sum256(data)
-    return hex.EncodeToString(hash[:])
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
 }

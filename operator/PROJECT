@@ -4,7 +4,7 @@
 # More info: https://book.kubebuilder.io/reference/project-config.html
 domain: pedge.io
 layout:
-  - go.kubebuilder.io/v4
+  - hybrid.helm.sdk.operatorframework.io/v1-alpha
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
@@ -29,9 +29,6 @@ resources:
     kind: MQTTServer
     path: github.com/example/memcached-operator/api/v1alpha1
     version: v1alpha1
-    webhooks:
-      defaulting: true
-      webhookVersion: v1
   - api:
       crdVersion: v1
       namespaced: true
@@ -39,6 +36,15 @@ resources:
     domain: pedge.io
     group: devices
     kind: Firmware
+    path: github.com/example/memcached-operator/api/v1alpha1
+    version: v1alpha1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: pedge.io
+    group: devices
+    kind: Telegraf
     path: github.com/example/memcached-operator/api/v1alpha1
     version: v1alpha1
 version: "3"

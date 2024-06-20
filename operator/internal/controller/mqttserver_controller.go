@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	miniov2 "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
-	miniov2 "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 
-    corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -21,7 +21,7 @@ import (
 	devicesv1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
 )
 
-const s3AccessKeyId = "accesskey" // ! cannot be changed - depends on the MinIO operator
+const s3AccessKeyId = "accesskey"     // ! cannot be changed - depends on the MinIO operator
 const s3SecretAccessKey = "secretkey" // ! cannot be changed - depends on the MinIO operator
 const deviceClusterSecretSuffix = "-device-cluster"
 const bucketName = "firmwares"
@@ -61,7 +61,7 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// * see https://github.com/minio/operator/blob/master/examples/kustomization/base/storage-user.yaml
 	// * and https://github.com/minio/operator/blob/fd7ede7ba9b5e0c4730284afff84c1350933f848/examples/kustomization/base/tenant.yaml#L33
 	var secret corev1.Secret
-    if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: server.Namespace}, &secret); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: server.Namespace}, &secret); err != nil {
 		logger.Info("Creating new secret " + secretName)
 		accessKey := generateRandomPassword(20)
 		secretKey := generateRandomPassword(40)
@@ -71,25 +71,25 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Namespace: server.Namespace,
 			},
 			Data: map[string][]byte{
-				s3AccessKeyId: []byte(accessKey), 
+				s3AccessKeyId:     []byte(accessKey),
 				s3SecretAccessKey: []byte(secretKey),
-				"config.env": []byte(fmt.Sprintf("export MINIO_ROOT_USER=%s\nexport MINIO_ROOT_PASSWORD=%s", accessKey, secretKey)),
+				"config.env":      []byte(fmt.Sprintf("export MINIO_ROOT_USER=%s\nexport MINIO_ROOT_PASSWORD=%s", accessKey, secretKey)),
 			},
 		}
 		// Set the ownerRef for the secret to ensure it gets cleaned up when the device cluster is deleted
 		// if err := ctrl.SetControllerReference(server, secret, r.Scheme); err != nil {
 		// 	return ctrl.Result{}, err
 		// }
-		
+
 		if err := r.Create(ctx, &secret); err != nil {
-			logger.Error(err, "Unable to create secret " + secretName)
+			logger.Error(err, "Unable to create secret "+secretName)
 			return ctrl.Result{}, err
 		}
-    } else {
+	} else {
 		// TODO watch the secret for changes
 		changed := false
 		s3Key := string(secret.Data[s3AccessKeyId])
-		if s3Key== "" {
+		if s3Key == "" {
 			logger.Info("Creating a default value for" + s3AccessKeyId + " in secret " + secretName)
 			s3Key = generateRandomPassword(20)
 			secret.Data[s3AccessKeyId] = []byte(s3Key)
@@ -102,7 +102,7 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			secret.Data[s3SecretAccessKey] = []byte(s3Secret)
 			changed = true
 		}
-		configEnv :=  fmt.Sprintf("export MINIO_ROOT_USER=%s\nexport MINIO_ROOT_PASSWORD=%s", s3Key, s3Secret)
+		configEnv := fmt.Sprintf("export MINIO_ROOT_USER=%s\nexport MINIO_ROOT_PASSWORD=%s", s3Key, s3Secret)
 		if string(secret.Data["config.env"]) != configEnv {
 			logger.Info("Updating config.env value for in secret " + secretName)
 			secret.Data["config.env"] = []byte(configEnv)
@@ -112,10 +112,10 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if changed {
 			logger.Info("Updating secret " + secretName)
 			if err := r.Update(ctx, &secret); err != nil {
-				logger.Error(err, "unable to update secret " + secretName)
+				logger.Error(err, "unable to update secret "+secretName)
 				return ctrl.Result{}, err
 			}
-		} 
+		}
 
 	}
 
@@ -231,10 +231,10 @@ func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *device
 			},
 		},
 		Spec: miniov2.TenantSpec{
-            Pools: []miniov2.Pool{
-                {
-					Name: "minio-pool-default",
-                    Servers:         4, // TODO may be a bit too much
+			Pools: []miniov2.Pool{
+				{
+					Name:             "minio-pool-default",
+					Servers:          4, // TODO may be a bit too much
 					VolumesPerServer: 4,
 					VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
@@ -242,28 +242,28 @@ func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *device
 						},
 						Spec: corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-							Resources: corev1.VolumeResourceRequirements{ 
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceStorage: resource.MustParse("2Gi"),
 								},
 							},
 						},
 					},
-                },
-            },
+				},
+			},
 			Buckets: []miniov2.Bucket{
 				{
-					Name: bucketName,
-					Region: bucketRegion,
+					Name:          bucketName,
+					Region:        bucketRegion,
 					ObjectLocking: false,
 				},
 			},
 			// CredsSecret is not working anymore: https://github.com/minio/operator/blob/master/pkg/apis/minio.min.io/v2/types.go#L356C2-L356C15
-            Configuration: &corev1.LocalObjectReference{
-                Name:           server.Name + deviceClusterSecretSuffix,
-            },
-            RequestAutoCert: &requestAutoCert,
-        },
+			Configuration: &corev1.LocalObjectReference{
+				Name: server.Name + deviceClusterSecretSuffix,
+			},
+			RequestAutoCert: &requestAutoCert,
+		},
 	}
 
 	resources := []client.Object{cluster, queue, tenant}

@@ -1,0 +1,7 @@
+# Use the 'create api' subcommand to add watches to this file.
+# The Telegraf chart is not used and here only to demonstrate how to develop an hybrid go/helm operator.
+- group: devices.pedge.io
+  version: v1
+  kind: Telegraf
+  chart: helm-charts/telegraf
+#+kubebuilder:scaffold:watch

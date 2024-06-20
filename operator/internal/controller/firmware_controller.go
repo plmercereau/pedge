@@ -59,12 +59,10 @@ func (r *FirmwareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-
 // SetupWithManager sets up the controller with the Manager
 func (r *FirmwareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&devicesv1alpha1.Firmware{}).
 		Owns(&devicesv1alpha1.Device{}).
-
 		Complete(r)
 }

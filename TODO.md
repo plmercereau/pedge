@@ -2,6 +2,14 @@
 
   - Rename "MQTTServer" to "DeviceCluster"
     - endpoint: get information from loadbalancer
+  - Integrate telegraf
+    - either
+      - add a telegraf CRD + controller
+        - find a way to hybrid go+helm operator
+          - https://github.com/operator-framework/helm-operator-plugins
+      - when a new DeviceCluster / MQTTServer is added:
+        - add a Telegraf CR
+  - Same pattern for influxdb2 and grafana?
 
 - configure influxdb/grafana
   - Grafana map

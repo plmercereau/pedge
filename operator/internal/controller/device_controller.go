@@ -1,5 +1,6 @@
 package controller
-/* 
+
+/*
 TODO
 network: # TODO network.type: gsm
   gsm:
@@ -13,24 +14,24 @@ import (
 	"context"
 	"fmt"
 
-    rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
-    batchv1 "k8s.io/api/batch/v1"
-    corev1 "k8s.io/api/core/v1"
-    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-    "k8s.io/apimachinery/pkg/runtime"
-    "k8s.io/apimachinery/pkg/fields"
-    "k8s.io/apimachinery/pkg/types"
+	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-    ctrl "sigs.k8s.io/controller-runtime"
-    "sigs.k8s.io/controller-runtime/pkg/builder"
-    "sigs.k8s.io/controller-runtime/pkg/client"
-    "sigs.k8s.io/controller-runtime/pkg/handler"
-    "sigs.k8s.io/controller-runtime/pkg/reconcile"
-    // "sigs.k8s.io/controller-runtime/pkg/source"
-    "sigs.k8s.io/controller-runtime/pkg/predicate"
-    "sigs.k8s.io/controller-runtime/pkg/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	// "sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	// TODO change this
-    devicesv1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
+	devicesv1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
 )
 
 // DeviceReconciler reconciles a Device object
@@ -96,7 +97,7 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	var mqttServer *devicesv1alpha1.MQTTServer 
+	var mqttServer *devicesv1alpha1.MQTTServer
 	mqttServer = &devicesv1alpha1.MQTTServer{}
 	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.MQTTServerReference.Name, Namespace: device.Namespace}, mqttServer); err != nil {
 		logger.Error(err, "unable to fetch MQTTServer")
@@ -149,7 +150,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 	// Secret
 	secretName := device.Name + "-user-credentials"
 	var secret corev1.Secret
-    if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: device.Namespace}, &secret); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: device.Namespace}, &secret); err != nil {
 		logger.Info("Creating new secret " + secretName)
 		secret = corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -157,7 +158,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 				Namespace: device.Namespace,
 			},
 			Data: map[string][]byte{
-				"username": []byte(device.Name), 
+				"username": []byte(device.Name),
 				"password": []byte(generateRandomPassword(16)),
 				"gsm_pin":  []byte(""),
 			},
@@ -166,14 +167,14 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 		// if err := ctrl.SetControllerReference(device, secret, r.Scheme); err != nil {
 		// 	return err
 		// }
-		
+
 		if err := r.Create(ctx, &secret); err != nil {
-			logger.Error(err, "Unable to create secret " + secretName)
+			logger.Error(err, "Unable to create secret "+secretName)
 			return err
 		}
-    } else {
+	} else {
 		changed := false
-		if (secret.Data["gsm_pin"] == nil) {
+		if secret.Data["gsm_pin"] == nil {
 			secret.Data["gsm_pin"] = []byte("")
 			changed = true
 		}
@@ -185,7 +186,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 		}
 		if changed {
 			if err := r.Update(ctx, &secret); err != nil {
-				logger.Error(err, "Unable to update secret " + secretName)
+				logger.Error(err, "Unable to update secret "+secretName)
 				return err
 			}
 		}
@@ -202,8 +203,8 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 			},
 			Annotations: map[string]string{
 				// Needed to trigger a reconciliation when the password changes
-                "checksum/password": computeSHA256(secret.Data["password"]),
-            },
+				"checksum/password": computeSHA256(secret.Data["password"]),
+			},
 		},
 		Spec: rabbitmqtopologyv1.UserSpec{
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
@@ -352,30 +353,30 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *devicesv1a
 											Value: fmt.Sprintf("https://minio.%s.svc.cluster.local", mqttServer.Namespace),
 										},
 										{
-											Name: "AWS_DEFAULT_REGION",
+											Name:  "AWS_DEFAULT_REGION",
 											Value: bucketRegion,
 										},
 										{
-										    Name: "AWS_ACCESS_KEY_ID",
-										    ValueFrom: &corev1.EnvVarSource{
-										        SecretKeyRef: &corev1.SecretKeySelector{
-										            LocalObjectReference: corev1.LocalObjectReference{
-										                Name: mqttServer.Name + deviceClusterSecretSuffix,
-										            },
-										            Key: s3AccessKeyId,
-										        },
-										    },
+											Name: "AWS_ACCESS_KEY_ID",
+											ValueFrom: &corev1.EnvVarSource{
+												SecretKeyRef: &corev1.SecretKeySelector{
+													LocalObjectReference: corev1.LocalObjectReference{
+														Name: mqttServer.Name + deviceClusterSecretSuffix,
+													},
+													Key: s3AccessKeyId,
+												},
+											},
 										},
 										{
-										    Name: "AWS_SECRET_ACCESS_KEY",
-										    ValueFrom: &corev1.EnvVarSource{
-										        SecretKeyRef: &corev1.SecretKeySelector{
-										            LocalObjectReference: corev1.LocalObjectReference{
+											Name: "AWS_SECRET_ACCESS_KEY",
+											ValueFrom: &corev1.EnvVarSource{
+												SecretKeyRef: &corev1.SecretKeySelector{
+													LocalObjectReference: corev1.LocalObjectReference{
 														Name: mqttServer.Name + deviceClusterSecretSuffix,
-										            },
-										            Key: s3SecretAccessKey,
-										        },
-										    },
+													},
+													Key: s3SecretAccessKey,
+												},
+											},
 										},
 									},
 									VolumeMounts: []corev1.VolumeMount{
@@ -450,36 +451,36 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&devicesv1alpha1.Device{}).
-		Owns(&corev1.Secret{}). // ? do I need to own the Secret? 
+		Owns(&corev1.Secret{}). // ? do I need to own the Secret?
 		// TODO probably watch MQTTServer, too
 		Watches(
-            // &source.Kind{Type: &devicesv1alpha1.Firmware{}},
+			// &source.Kind{Type: &devicesv1alpha1.Firmware{}},
 			&devicesv1alpha1.Firmware{},
-            handler.EnqueueRequestsFromMapFunc(r.findObjectsForFirmware),
-            builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-        ).
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForFirmware),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
 }
 
 func (r *DeviceReconciler) findObjectsForFirmware(ctx context.Context, device client.Object) []reconcile.Request {
-    attachedDevices := &devicesv1alpha1.DeviceList{}
-    listOps := &client.ListOptions{
-        FieldSelector: fields.OneTermEqualSelector(".spec.firmwareReference.name", device.GetName()),
-        Namespace:     device.GetNamespace(),
-    }
-    err := r.List(ctx, attachedDevices, listOps)
-    if err != nil {
-        return []reconcile.Request{}
-    }
+	attachedDevices := &devicesv1alpha1.DeviceList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(".spec.firmwareReference.name", device.GetName()),
+		Namespace:     device.GetNamespace(),
+	}
+	err := r.List(ctx, attachedDevices, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
 
-    requests := make([]reconcile.Request, len(attachedDevices.Items))
-    for i, item := range attachedDevices.Items {
-        requests[i] = reconcile.Request{
-            NamespacedName: types.NamespacedName{
-                Name:      item.GetName(),
-                Namespace: item.GetNamespace(),
-            },
-        }
-    }
-    return requests
+	requests := make([]reconcile.Request, len(attachedDevices.Items))
+	for i, item := range attachedDevices.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
 }
