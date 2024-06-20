@@ -2,7 +2,8 @@
 
   - Rename "MQTTServer" to "DeviceCluster"
     - endpoint: get information from loadbalancer
-  - Rename "esp\*" to "~mcu~"
+  - Rename "esp\*" to mcu
+  - Rename device to mcu? think about the same system for sbc
   - move netboot stuff to another repo
   - Integrate telegraf/influxdb2/grafana
     - dedicated chart
