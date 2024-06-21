@@ -37,10 +37,11 @@ telegraf:
   enabled: true
   fullnameOverride: telegraf
   tplVersion: 2
-  # TODO telegraf should restart if the secret changes
   # Get the config from influxdb-auth secret, that is be updated by the operator with MQTT credentials and details
   # That way, we don't need influxdb/grafana to be in the same namespace as rabbitmq
   envFromSecret: influxdb-auth
+  podAnnotations:
+    reloader.stakater.com/search: "true"
 
   config:
     agent:
@@ -100,3 +101,10 @@ telegraf:
           token: "${INFLUXDB_TOKEN}"
           organization: "influxdata"
           bucket: "default"
+
+# Used for telegraf to restart when the influxdb-auth secret changes
+# Note: not possible to set the secret annotation from the influxdb chart. This is done by the operator
+# ? maybe better to manually set the secret in a dedicated helm template?
+reloader:
+  fullnameOverride: reloader
+  enabled: true

@@ -63,7 +63,7 @@ func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Secret
 	secretName := server.Name + deviceClusterSecretSuffix
-	// TODO decidated minio user, and dedicated rabbitmq/mqtt "listener" user
+	// TODO decidated minio user
 	// * see https://github.com/minio/operator/blob/master/examples/kustomization/base/storage-user.yaml
 	// * and https://github.com/minio/operator/blob/fd7ede7ba9b5e0c4730284afff84c1350933f848/examples/kustomization/base/tenant.yaml#L33
 	var secret corev1.Secret
@@ -92,7 +92,6 @@ func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 	} else {
-		// TODO watch the secret for changes - see the logic in the Device controller
 		changed := false
 		s3Key := string(secret.Data[s3AccessKeyId])
 		if s3Key == "" {
@@ -236,6 +235,17 @@ log.console.level = debug
 		}
 
 		changed := false
+		
+		// Add reloader.stakater.com/match: "true" to the secret to trigger a reload of the telegraf config
+		if influxDBSecret.Annotations == nil {
+			influxDBSecret.Annotations = make(map[string]string)
+			// check if reloader.stakater.com/match exists and is set to "true"
+			if influxDBSecret.Annotations["reloader.stakater.com/match"] != "true" {
+				influxDBSecret.Annotations["reloader.stakater.com/match"] = "true"
+				changed = true
+			}
+		}
+		
 		if influxDBSecret.Data["MQTT_USERNAME"] == nil || string(influxDBSecret.Data["MQTT_USERNAME"]) != listenerUserName {
 			influxDBSecret.Data["MQTT_USERNAME"] = []byte(listenerUserName)
 			changed = true
@@ -285,7 +295,7 @@ log.console.level = debug
 		},
 	}
 	// TODO it seems rabbitmq is already watching/owning the user, and when set to server, the permissions are not applied
-	// TODO for now, accept users are not deleted with the device cluster...
+	// For now, accept users are not deleted with the device cluster...
 	// controllerutil.SetOwnerReference(server, listenerUser, r.Scheme)
 
 	// Define the desired RabbitMQ Permission resource

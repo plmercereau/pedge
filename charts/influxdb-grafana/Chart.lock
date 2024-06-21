@@ -8,5 +8,8 @@ dependencies:
 - name: telegraf
   repository: https://helm.influxdata.com
   version: 1.8.49
-digest: sha256:9193125542cd2d3aaeddba89b91ce64c07755ad3cab693cb7f4296c357f9e993
-generated: "2024-06-21T09:16:34.914469+02:00"
+- name: reloader
+  repository: https://stakater.github.io/stakater-charts
+  version: 1.0.114
+digest: sha256:9da9e4a5819cc84d13b7b60f2a5145a7ff2352caa78271f7fd853b5cd7c71ff6
+generated: "2024-06-21T18:01:28.830883+02:00"
