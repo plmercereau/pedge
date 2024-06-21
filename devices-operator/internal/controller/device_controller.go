@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	// "sigs.k8s.io/controller-runtime/pkg/source"
 	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -25,11 +26,12 @@ import (
 )
 
 const (
-	// TODO try change the suffix now that we are "managing" the secret, and as the rabbitmq operator takes ownership of it
+	// The suffix should not change: the rabbitmq operator takes ownership of it, 
+	// and still creates a -user-credentials secret even when asked otherwise. Investigate.
 	deviceSecretSuffix        = "-user-credentials"
 	secretNameLabel           = "pedge.io/secret-name"
 	secretVersionAnnotation   = "pedge.io/secret-version"
-	firmwareVersionAnnotation = "pedge.io/firmware-version"
+	serviceAnnotation  = "pedge.io/service"
 )
 
 // DeviceReconciler reconciles a Device object
@@ -44,6 +46,7 @@ type DeviceReconciler struct {
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rabbitmq.com,resources=permissions;topicpermissions;users,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch
 
 func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -70,8 +73,7 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	var deviceCluster *pedgev1alpha1.DeviceCluster
-	deviceCluster = &pedgev1alpha1.DeviceCluster{}
+	deviceCluster := &pedgev1alpha1.DeviceCluster{}
 	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClusterReference.Name, Namespace: device.Namespace}, deviceCluster); err != nil {
 		logger.Error(err, "unable to fetch DeviceCluster")
 		return ctrl.Result{}, err
@@ -226,15 +228,43 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 	}
 
 	resources := []client.Object{user, permission, topicPermission}
+	for _, res := range resources {
+		if err := r.CreateOrUpdate(ctx, res); err != nil {
+			return err
+		}
+	}
 
 	if firmware != nil {
+		logger.Info("Found firmware. Generating job...")
 		jobName := device.Name + "-firmware-build"
 		builderImage := firmware.Spec.Builder.Image
 		job := &batchv1.Job{}
 		err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: device.Namespace}, job)
 		if err != nil && errors.IsNotFound(err) {
 			logger.Info("Creating new firmware build job " + jobName)
-
+			service := &corev1.Service{}
+			err := r.Get(ctx, types.NamespacedName{Name: deviceCluster.Name, Namespace: deviceCluster.Namespace}, service)
+			if err != nil {
+				logger.Error(err, "unable to fetch service")
+				return err
+			}
+			// TODO check if the service is a LoadBalancer and has an IP. Warn if more than one IP
+			// TODO use possible custom broker/port values in the DeviceCluster spec
+			serviceIngress := service.Status.LoadBalancer.Ingress[0]
+			var mqttBroker string
+			if serviceIngress.Hostname != "" {
+				mqttBroker = serviceIngress.Hostname
+			} else {
+				mqttBroker = serviceIngress.IP
+			}
+			mqttPortInt := -1
+			for _, port := range service.Spec.Ports {
+				if port.Name == "mqtt" {
+					mqttPortInt = int(port.Port)
+					break
+				}
+			}
+			mqttPort := fmt.Sprint(mqttPortInt)
 			job := &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      jobName,
@@ -245,11 +275,12 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 				},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
-						// TODO check this: re-trigger the job when the firmware or secret changes. It may mean we need to update the firmware first?
+						// Re-trigger the job when the firmware, secret changes or service changes
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								firmwareVersionAnnotation: firmware.GetResourceVersion(),
+								// We don't need annotate changes in the firmare as for now only the builder image can change
 								secretVersionAnnotation:   secretVersion,
+								serviceAnnotation: fmt.Sprintf("%s:%s", mqttBroker, mqttPort),
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -278,11 +309,11 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 										},
 										{
 											Name:  "MQTT_BROKER",
-											Value: "TODO", // TODO get from the DeviceCluster / the loadbalancer
+											Value: mqttBroker,
 										},
 										{
 											Name:  "MQTT_PORT",
-											Value: "1883", // TODO get from the DeviceCluster / the loadbalancer
+											Value: mqttPort,
 										},
 										{
 											Name:  "DEVICE_NAME",
@@ -365,15 +396,12 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 			if err := ctrl.SetControllerReference(device, job, r.Scheme); err != nil {
 				return err
 			}
-			resources = append(resources, job)
+			if err := r.CreateOrUpdate(ctx, job); err != nil {
+				return err
+			}
 		}
 	}
 
-	for _, res := range resources {
-		if err := r.CreateOrUpdate(ctx, res); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -411,15 +439,23 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.Device{}).
-		// TODO Watch DeviceCluster, too
+		// TODO Watch DeviceCluster, too (the queue name can change)
+		// Watch for changes in the secret of the device
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		// Watch for changes in the firmware of the device
 		Watches(
 			&pedgev1alpha1.Firmware{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForFirmware),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		// Watch for changes in the service exposing the devices cluster
+		Watches(
+			&corev1.Service{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForService),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Complete(r)
@@ -451,10 +487,33 @@ func (r *DeviceReconciler) findObjectsForSecret(ctx context.Context, secret clie
 }
 
 func (r *DeviceReconciler) findObjectsForFirmware(ctx context.Context, firmware client.Object) []reconcile.Request {
-	attachedDevices := &pedgev1alpha1.FirmwareList{}
+	attachedDevices := &pedgev1alpha1.DeviceList{}
 	listOps := &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(".spec.firmwareReference.name", firmware.GetName()),
 		Namespace:     firmware.GetNamespace(),
+	}
+	err := r.List(ctx, attachedDevices, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(attachedDevices.Items))
+	for i, item := range attachedDevices.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
+}
+
+func (r *DeviceReconciler) findObjectsForService(ctx context.Context, service client.Object) []reconcile.Request {
+	attachedDevices := &pedgev1alpha1.DeviceList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(".metadata.name", service.GetName()),
+		Namespace:     service.GetNamespace(),
 	}
 	err := r.List(ctx, attachedDevices, listOps)
 	if err != nil {

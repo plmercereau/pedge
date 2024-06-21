@@ -36,8 +36,6 @@ spec:
             properties:
               influxdb:
                 properties:
-                  name:
-                    type: string
                   namespace:
                     type: string
                   secretReference:
