@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
 
-env:
-  package_name: esp32-sim7600
+# env:
+#   package_name: firmare-builder-esp32-sim7600
 
 jobs:
   build:
