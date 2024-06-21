@@ -13,8 +13,6 @@ type QueueSpec struct {
 
 type InfluxDB struct {
 	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty" `
-	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace,omitempty"` // TODO add default value through a webhook
 	// +kubebuilder:validation:Required
 	SecretReference corev1.LocalObjectReference `json:"secretReference,omitempty"` // TODO default to influxdb-auth

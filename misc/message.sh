@@ -5,7 +5,6 @@ CLUSTER_NAME=devices-cluster
 QUEUE_NAME=esp-queue
 
 SECRET=$CLUSTER_NAME-default-user
-# SECRET=device-listener-user-credentials
 # SECRET=device-sample-user-credentials
 USER=$(kubectl -n $NAMESPACE get secret $SECRET -o jsonpath="{.data.username}" | base64 -d)
 PASSWORD=$(kubectl -n $NAMESPACE get secret $SECRET -o jsonpath="{.data.password}" | base64 -d)

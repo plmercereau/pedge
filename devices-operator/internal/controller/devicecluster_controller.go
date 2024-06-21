@@ -18,6 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -154,9 +155,8 @@ log.console.level = debug
 			},
 		},
 	}
+	controllerutil.SetOwnerReference(server, cluster, r.Scheme)
 
-	// TODO: rabbitmq operator doesn't allow updates on spec.name and spec.rabbtmqClusterReference -> do not try to update them
-	// TODO we should also block updates on the device cluster name - through a validation webhook
 	vhost := &rabbitmqtopologyv1.Vhost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name + "-default",
@@ -169,6 +169,13 @@ log.console.level = debug
 				Namespace: server.Namespace,
 			},
 		},
+	}
+	controllerutil.SetOwnerReference(server, vhost, r.Scheme)
+	// We only create the vhost if it doesn't exist. The RabbitMQ messaging topology operator does not allow to modify it.
+	// TODO we should also block some updates on the device cluster name - through a validation webhook
+	existingVhost := vhost.DeepCopyObject().(client.Object)
+	if err := r.Get(ctx, client.ObjectKeyFromObject(vhost), existingVhost); err != nil && errors.IsNotFound(err) {
+		return r.Create(ctx, vhost)
 	}
 
 	queue := &rabbitmqtopologyv1.Queue{
@@ -185,13 +192,40 @@ log.console.level = debug
 			},
 		},
 	}
-	// TODO store MQTT_URL/MQTT_TOPIC in influxdb-auth in the influxdb namespace??
-	// TODO use influxDBSecretVersion as an annotation in telegraf
-	// var influxDBSecretVersion string
-	var influxDBToken string
-	var influxDBPassword string
-	var influxDBURL string
-	useInfluxDB := false
+	controllerutil.SetOwnerReference(server, queue, r.Scheme)
+	// We only create the queue if it doesn't exist. The RabbitMQ messaging topology operator does not allow to modify it.
+	existingQueue := queue.DeepCopyObject().(client.Object)
+	if err := r.Get(ctx, client.ObjectKeyFromObject(queue), existingQueue); err != nil && errors.IsNotFound(err) {
+		return r.Create(ctx, queue)
+	}
+
+	var listenerSecret corev1.Secret
+	secretName := listenerUserName + deviceSecretSuffix
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: server.Namespace}, &listenerSecret); err != nil {
+		listenerSecret = corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: server.Namespace,
+			},
+			Data: map[string][]byte{
+				"username": []byte(listenerUserName),
+				"password": []byte(generateRandomPassword(16)),
+			},
+		}
+
+		if err := r.Create(ctx, &listenerSecret); err != nil {
+			return err
+		}
+	} else {
+		if string(listenerSecret.Data["username"]) != listenerUserName {
+			listenerSecret.Data["username"] = []byte(listenerUserName)
+			if err := r.Update(ctx, &listenerSecret); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Store MQTT URL/TOPIC/USERNAME/PASSWORD in influxdb-auth in the influxdb namespace
 	if server.Spec.InfluxDB != (pedgev1alpha1.InfluxDB{}) {
 		influxDBSecret := &corev1.Secret{}
 		err := r.Get(ctx, types.NamespacedName{Name: server.Spec.InfluxDB.SecretReference.Name, Namespace: server.Spec.InfluxDB.Namespace}, influxDBSecret)
@@ -201,72 +235,31 @@ log.console.level = debug
 			return err
 		}
 
-		useInfluxDB = true
-		// influxDBSecretVersion = influxDBSecret.ResourceVersion
-		influxDBToken = string(influxDBSecret.Data["admin-token"])
-		influxDBPassword = string(influxDBSecret.Data["admin-password"])
-		influxDBURL = fmt.Sprintf("http://%s.%s.svc", server.Spec.InfluxDB.Name, server.Spec.InfluxDB.Namespace)
-	}
-
-	var listenerSecret corev1.Secret
-	secretName := listenerUserName + deviceSecretSuffix
-	mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", server.Name, server.Namespace, "1883")
-	mqttTopic := server.Spec.Queue.Name
-	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: server.Namespace}, &listenerSecret); err != nil {
-		data := map[string][]byte{
-			"username":   []byte(listenerUserName),
-			"password":   []byte(generateRandomPassword(16)),
-			"MQTT_URL":   []byte(mqttUrl),
-			"MQTT_TOPIC": []byte(mqttTopic),
-		}
-		if useInfluxDB {
-			data["INFLUXDB_TOKEN"] = []byte(influxDBToken)
-			data["INFLUXDB_PASSWORD"] = []byte(influxDBPassword)
-			data["INFLUXDB_URL"] = []byte(influxDBURL)
-		}
-		listenerSecret = corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: server.Namespace,
-			},
-			Data: map[string][]byte{
-				"username":   []byte(listenerUserName),
-				"password":   []byte(generateRandomPassword(16)),
-				"MQTT_URL":   []byte(mqttUrl),
-				"MQTT_TOPIC": []byte(mqttTopic),
-			},
-		}
-
-		if err := r.Create(ctx, &listenerSecret); err != nil {
-			return err
-		}
-	} else {
 		changed := false
-		if listenerSecret.Data["MQTT_URL"] == nil || string(listenerSecret.Data["MQTT_URL"]) != mqttUrl {
-			listenerSecret.Data["MQTT_URL"] = []byte(mqttUrl)
+		if influxDBSecret.Data["MQTT_USERNAME"] == nil || string(influxDBSecret.Data["MQTT_USERNAME"]) != listenerUserName {
+			influxDBSecret.Data["MQTT_USERNAME"] = []byte(listenerUserName)
 			changed = true
 		}
-		if listenerSecret.Data["MQTT_TOPIC"] == nil || string(listenerSecret.Data["MQTT_TOPIC"]) != mqttTopic {
-			listenerSecret.Data["MQTT_TOPIC"] = []byte(mqttTopic)
+		if influxDBSecret.Data["MQTT_PASSWORD"] == nil || string(influxDBSecret.Data["MQTT_PASSWORD"]) != string(listenerSecret.Data["password"]) {
+			influxDBSecret.Data["MQTT_PASSWORD"] = listenerSecret.Data["password"]
 			changed = true
 		}
-		if useInfluxDB {
-			if listenerSecret.Data["INFLUXDB_TOKEN"] == nil || string(listenerSecret.Data["INFLUXDB_TOKEN"]) != influxDBToken {
-				listenerSecret.Data["INFLUXDB_TOKEN"] = []byte(influxDBToken)
-				changed = true
-			}
-			if listenerSecret.Data["INFLUXDB_PASSWORD"] == nil || string(listenerSecret.Data["INFLUXDB_PASSWORD"]) != influxDBPassword {
-				listenerSecret.Data["INFLUXDB_PASSWORD"] = []byte(influxDBPassword)
-				changed = true
-			}
-			if listenerSecret.Data["INFLUXDB_URL"] == nil || string(listenerSecret.Data["INFLUXDB_URL"]) != influxDBURL {
-				listenerSecret.Data["INFLUXDB_URL"] = []byte(influxDBURL)
-				changed = true
-			}
+		if influxDBSecret.Data["MQTT_TOPIC"] == nil || string(influxDBSecret.Data["MQTT_TOPIC"]) != server.Spec.Queue.Name {
+			influxDBSecret.Data["MQTT_TOPIC"] = []byte(server.Spec.Queue.Name)
+			changed = true
 		}
-
+		mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", server.Name, server.Namespace, "1883")
+		if influxDBSecret.Data["MQTT_URL"] == nil || string(influxDBSecret.Data["MQTT_URL"]) != mqttUrl {
+			influxDBSecret.Data["MQTT_URL"] = []byte(mqttUrl)
+			changed = true
+		}
+		// ! For some reason, telegraf does not allow admin-token as an environment variable, maybe because of the dash
+		if influxDBSecret.Data["INFLUXDB_TOKEN"] == nil || string(influxDBSecret.Data["INFLUXDB_TOKEN"]) != string(influxDBSecret.Data["admin-token"]) {
+			influxDBSecret.Data["INFLUXDB_TOKEN"] = influxDBSecret.Data["admin-token"]
+			changed = true
+		}
 		if changed {
-			if err := r.Update(ctx, &listenerSecret); err != nil {
+			if err := r.Update(ctx, influxDBSecret); err != nil {
 				return err
 			}
 		}
@@ -291,6 +284,9 @@ log.console.level = debug
 			},
 		},
 	}
+	// TODO it seems rabbitmq is already watching/owning the user, and when set to server, the permissions are not applied
+	// TODO for now, accept users are not deleted with the device cluster...
+	// controllerutil.SetOwnerReference(server, listenerUser, r.Scheme)
 
 	// Define the desired RabbitMQ Permission resource
 	listenerPermission := &rabbitmqtopologyv1.Permission{
@@ -304,9 +300,6 @@ log.console.level = debug
 				Name: listenerUser.Name,
 			},
 			Permissions: rabbitmqtopologyv1.VhostPermissions{
-				// Configure: ".*",
-				// Write:     ".*",
-				// Read:      ".*",
 				Configure: "^mqtt-subscription-.*$",
 				Write:     "^amq\\.topic$|^mqtt-subscription-.*$",
 				Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
@@ -317,6 +310,7 @@ log.console.level = debug
 			},
 		},
 	}
+	// controllerutil.SetOwnerReference(server, listenerPermission, r.Scheme)
 
 	// Define the desired RabbitMQ TopicPermission resource
 	listenerTopicPermission := &rabbitmqtopologyv1.TopicPermission{
@@ -340,6 +334,7 @@ log.console.level = debug
 			},
 		},
 	}
+	// controllerutil.SetOwnerReference(server, listenerTopicPermission, r.Scheme)
 
 	// self-signed certificate. If exposing over the internet, use cert-manager + letsencrypt
 	requestAutoCert := true
@@ -347,6 +342,10 @@ log.console.level = debug
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name,
 			Namespace: server.Namespace,
+			// the minio controller is not behaving well when using controllerutil.SetOwnerReference
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
+			},
 		},
 		Spec: miniov2.TenantSpec{
 			Pools: []miniov2.Pool{
@@ -384,7 +383,7 @@ log.console.level = debug
 		},
 	}
 
-	resources := []client.Object{cluster, vhost, queue, tenant, listenerUser, listenerPermission, listenerTopicPermission}
+	resources := []client.Object{cluster, tenant, listenerUser, listenerPermission, listenerTopicPermission}
 	for _, res := range resources {
 		if err := r.CreateOrUpdate(ctx, res); err != nil {
 			return err

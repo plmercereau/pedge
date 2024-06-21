@@ -38,11 +38,9 @@ telegraf:
   fullnameOverride: telegraf
   tplVersion: 2
   # TODO telegraf should restart if the secret changes
-  # TODO get the config from influxdb-auth secret, that would be updated by the operator with MQTT credentials
+  # Get the config from influxdb-auth secret, that is be updated by the operator with MQTT credentials and details
   # That way, we don't need influxdb/grafana to be in the same namespace as rabbitmq
-  # TODO we also don't need INFLUXDB_URL anymore - update the controller and the CRD
-  # envFromSecret: influxdb-auth
-  envFromSecret: device-listener-user-credentials
+  envFromSecret: influxdb-auth
 
   config:
     agent:
@@ -72,8 +70,8 @@ telegraf:
       - mqtt_consumer:
           servers:
             - "${MQTT_URL}"
-          username: "${username}"
-          password: "${password}"
+          username: "${MQTT_USERNAME}"
+          password: "${MQTT_PASSWORD}"
           topics:
             - "${MQTT_TOPIC}/+/coordinates"
           data_format: "json_v2"
@@ -98,8 +96,7 @@ telegraf:
     outputs:
       - influxdb_v2:
           urls:
-            # - "http://influxdb"
-            - "${INFLUXDB_URL}"
-          token: "${INFLUXDB_TOKEN}" # TODO make it works
+            - "http://influxdb"
+          token: "${INFLUXDB_TOKEN}"
           organization: "influxdata"
           bucket: "default"
