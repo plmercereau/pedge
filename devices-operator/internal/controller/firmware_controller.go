@@ -18,7 +18,6 @@ type FirmwareReconciler struct {
 
 //+kubebuilder:rbac:groups=devices.pedge.io,resources=firmwares,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=devices.pedge.io,resources=firmwares/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=firmwares/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
 func (r *FirmwareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -33,26 +32,6 @@ func (r *FirmwareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 		logger.Error(err, "Uunable to fetch Firmware")
 		return ctrl.Result{}, err
-	}
-
-	// Check if the Firmware is marked for deletion
-	if firmware.GetDeletionTimestamp() != nil {
-		if containsString(firmware.GetFinalizers(), deviceFinalizer) {
-			// Remove finalizer
-			firmware.SetFinalizers(removeString(firmware.GetFinalizers(), deviceFinalizer))
-			if err := r.Update(ctx, firmware); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
-
-	// Add finalizer for this CR
-	if !containsString(firmware.GetFinalizers(), deviceFinalizer) {
-		firmware.SetFinalizers(append(firmware.GetFinalizers(), deviceFinalizer))
-		if err := r.Update(ctx, firmware); err != nil {
-			return ctrl.Result{}, err
-		}
 	}
 
 	return ctrl.Result{}, nil

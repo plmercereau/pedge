@@ -5,10 +5,9 @@ import (
 	"fmt"
 
 	miniov2 "github.com/minio/operator/pkg/apis/minio.min.io/v2"
+	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
-
-	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -20,11 +19,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const s3AccessKeyId = "accesskey"     // ! cannot be changed - depends on the MinIO operator
-const s3SecretAccessKey = "secretkey" // ! cannot be changed - depends on the MinIO operator
-const deviceClusterSecretSuffix = "-device-cluster"
-const bucketName = "firmwares"
-const bucketRegion = "default"
+const (
+	s3AccessKeyId             = "accesskey" // ! cannot be changed - depends on the MinIO operator
+	s3SecretAccessKey         = "secretkey" // ! cannot be changed - depends on the MinIO operator
+	deviceClusterSecretSuffix = "-device-cluster"
+	bucketName                = "firmwares"
+	bucketRegion              = "default"
+	listenerUserName          = "device-listener"
+)
 
 // DeviceClusterReconciler reconciles a DeviceCluster object
 type DeviceClusterReconciler struct {
@@ -34,10 +36,9 @@ type DeviceClusterReconciler struct {
 
 //+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rabbitmq.com,resources=rabbitmqclusters;queues,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rabbitmq.com,resources=rabbitmqclusters;vhosts;queues;permissions;topicpermissions;users,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=minio.min.io,resources=tenants,verbs=get;list;watch;create;update;patch;delete
 
 func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -117,67 +118,12 @@ func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	}
 
-	// Check if the DeviceCluster is marked for deletion
-	if server.GetDeletionTimestamp() != nil {
-		if containsString(server.GetFinalizers(), deviceFinalizer) {
-			// Finalize the server
-			if err := r.finalizeDeviceCluster(ctx, server); err != nil {
-				return ctrl.Result{}, err
-			}
-			// Remove finalizer
-			server.SetFinalizers(removeString(server.GetFinalizers(), deviceFinalizer))
-			if err := r.Update(ctx, server); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
-
-	// Add finalizer for this CR
-	if !containsString(server.GetFinalizers(), deviceFinalizer) {
-		server.SetFinalizers(append(server.GetFinalizers(), deviceFinalizer))
-		if err := r.Update(ctx, server); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
 	// Sync resources
 	if err := r.syncResources(ctx, server); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// finalizeDeviceCluster handles cleanup logic when a DeviceCluster is deleted
-func (r *DeviceClusterReconciler) finalizeDeviceCluster(ctx context.Context, server *pedgev1alpha1.DeviceCluster) error {
-	resources := []client.Object{
-		&rabbitmqv1.RabbitmqCluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      server.Name,
-				Namespace: server.Namespace,
-			},
-		},
-		&rabbitmqtopologyv1.Queue{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      server.Name,
-				Namespace: server.Namespace,
-			},
-		},
-		&miniov2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      server.Name,
-				Namespace: server.Namespace,
-			},
-		},
-	}
-
-	for _, res := range resources {
-		if err := r.Delete(ctx, res); client.IgnoreNotFound(err) != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // syncResources creates or updates the associated resources
@@ -187,9 +133,6 @@ func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *ped
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name,
 			Namespace: server.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
-			},
 		},
 		Spec: rabbitmqv1.RabbitmqClusterSpec{
 			Service: rabbitmqv1.RabbitmqClusterServiceSpec{
@@ -197,6 +140,26 @@ func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *ped
 			},
 			Rabbitmq: rabbitmqv1.RabbitmqClusterConfigurationSpec{
 				AdditionalPlugins: []rabbitmqv1.Plugin{"rabbitmq_mqtt"},
+				// TODO only for testing purposes
+				EnvConfig: `RABBITMQ_LOGS=""`,
+				AdditionalConfig: `
+log.console = true
+log.console.level = debug
+`,
+			},
+		},
+	}
+
+	vhost := &rabbitmqtopologyv1.Vhost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      server.Name + "-default",
+			Namespace: server.Namespace,
+		},
+		Spec: rabbitmqtopologyv1.VhostSpec{
+			Name: "/",
+			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
+				Name:      server.Name,
+				Namespace: server.Namespace,
 			},
 		},
 	}
@@ -205,12 +168,117 @@ func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *ped
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name,
 			Namespace: server.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
-			},
 		},
 		Spec: rabbitmqtopologyv1.QueueSpec{
 			Name: server.Spec.Queue.Name,
+			Vhost: vhost.Name, 
+			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
+				Name:      server.Name,
+				Namespace: server.Namespace,
+			},
+		},
+	}
+
+	var listenerSecret corev1.Secret
+	secretName := listenerUserName + deviceSecretSuffix
+	mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", server.Name, server.Namespace, "1883")
+	mqttTopic := server.Spec.Queue.Name
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: server.Namespace}, &listenerSecret); err != nil {
+		listenerSecret = corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: server.Namespace,
+			},
+			Data: map[string][]byte{
+				"username": []byte(listenerUserName),
+				"password": []byte(generateRandomPassword(16)),
+				"MQTT_URL": []byte(mqttUrl),
+				"MQTT_TOPIC": []byte(mqttTopic),
+			},
+		}
+
+		if err := r.Create(ctx, &listenerSecret); err != nil {
+			return err
+		}
+	} else {
+		changed := false		
+		if listenerSecret.Data["MQTT_URL"] == nil || string(listenerSecret.Data["MQTT_URL"]) != mqttUrl {
+			listenerSecret.Data["MQTT_URL"] = []byte(mqttUrl)
+			changed = true
+		}
+		if listenerSecret.Data["MQTT_TOPIC"] == nil || string(listenerSecret.Data["MQTT_TOPIC"]) != mqttTopic {
+			listenerSecret.Data["MQTT_TOPIC"] = []byte(mqttTopic)
+			changed = true
+		}
+		if changed {
+			if err := r.Update(ctx, &listenerSecret); err != nil {
+				return err
+			}
+		}
+	}
+
+	listenerUser := &rabbitmqtopologyv1.User{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      listenerUserName,
+			Namespace: server.Namespace,
+			Annotations: map[string]string{
+				// Needed to trigger a reconciliation when the password changes
+				secretVersionAnnotation: listenerSecret.GetResourceVersion(),
+			},
+		},
+		Spec: rabbitmqtopologyv1.UserSpec{
+			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
+				Name:      server.Name,
+				Namespace: server.Namespace,
+			},
+			ImportCredentialsSecret: &corev1.LocalObjectReference{
+				Name: listenerSecret.Name,
+			},
+		},
+	}
+
+	// Define the desired RabbitMQ Permission resource
+	listenerPermission := &rabbitmqtopologyv1.Permission{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      listenerUser.Name,
+			Namespace: listenerUser.Namespace,
+		},
+		Spec: rabbitmqtopologyv1.PermissionSpec{
+			Vhost: "/",
+			UserReference: &corev1.LocalObjectReference{
+				Name: listenerUser.Name,
+			},
+			Permissions: rabbitmqtopologyv1.VhostPermissions{
+				// Configure: ".*",
+				// Write:     ".*",
+				// Read:      ".*",
+				Configure: "^mqtt-subscription-.*$",
+				Write:     "^amq\\.topic$|^mqtt-subscription-.*$",
+				Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
+			},
+			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
+				Name:      server.Name,
+				Namespace: server.Namespace,
+			},
+		},
+	}
+
+	// Define the desired RabbitMQ TopicPermission resource
+	listenerTopicPermission := &rabbitmqtopologyv1.TopicPermission{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      listenerUser.Name,
+			Namespace: listenerUser.Namespace,
+		},
+		Spec: rabbitmqtopologyv1.TopicPermissionSpec{
+			Vhost: "/",
+			UserReference: &corev1.LocalObjectReference{
+				Name: listenerUser.Name,
+			},
+			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
+				Exchange: "amq.topic",
+				Write:    "",
+				Read: fmt.Sprintf("^%s\\..+$", server.Spec.Queue.Name),
+			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
 				Name:      server.Name,
 				Namespace: server.Namespace,
@@ -224,9 +292,6 @@ func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *ped
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name,
 			Namespace: server.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
-			},
 		},
 		Spec: miniov2.TenantSpec{
 			Pools: []miniov2.Pool{
@@ -264,7 +329,7 @@ func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *ped
 		},
 	}
 
-	resources := []client.Object{cluster, queue, tenant}
+	resources := []client.Object{cluster, vhost, queue, tenant, listenerUser, listenerPermission, listenerTopicPermission}
 	for _, res := range resources {
 		if err := r.CreateOrUpdate(ctx, res); err != nil {
 			return err
@@ -273,7 +338,7 @@ func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *ped
 	return nil
 }
 
-// CreateOrUpdate creates or updates a resource
+// creates or updates a resource
 func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
 	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 	existing := obj.DeepCopyObject().(client.Object)

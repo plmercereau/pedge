@@ -192,7 +192,8 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 				Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name: deviceCluster.Name,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
@@ -218,7 +219,8 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 				Read: fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.Queue.Name, device.Name),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name: deviceCluster.Name,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}

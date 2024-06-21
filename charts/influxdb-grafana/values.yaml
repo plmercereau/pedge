@@ -37,26 +37,17 @@ telegraf:
   enabled: true
   fullnameOverride: telegraf
   tplVersion: 2
-  # ! use envFromSecret
+  # TODO telegraf should restart if the secret changes
+  # TODO put telegraf into the operator...
+  envFromSecret: device-listener-user-credentials # ! This is the only way to connect to the operator-managed devices cluster
   # ? https://github.com/influxdata/telegraf/blob/release-1.31/docs/CONFIGURATION.md#secret-store-secrets
-  # TODO also set configuration e.g. organization, bucket, url through a dedicated configmap
   env:
     - name: INFLUXDB_TOKEN
       valueFrom:
         secretKeyRef:
           name: influxdb-auth
           key: admin-token
-    # TODO create a dedicated user and secret for connecting to MQTT - read access
-    - name: MQTT_USER
-      valueFrom:
-        secretKeyRef:
-          name: devices-cluster-default-user
-          key: username
-    - name: MQTT_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: devices-cluster-default-user
-          key: password
+
   config:
     agent:
       interval: "1s"
@@ -84,14 +75,12 @@ telegraf:
           percentile_limit: 1000
       - mqtt_consumer:
           servers:
-            # TODO in configmap
-            - "tcp://devices-cluster:1883"
-          username: "${MQTT_USER}"
-          password: "${MQTT_PASSWORD}"
+            - "${MQTT_URL}"
+          username: "${username}"
+          password: "${password}"
           topics:
-            - "devices-queue/+/coordinates"
-          data_format: "json_v2" # TODO https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
-          # data_format: "json"
+            - "${MQTT_TOPIC}/+/coordinates"
+          data_format: "json_v2"
           json_v2:
             - measurement_name: coordinates
               object:
@@ -103,7 +92,7 @@ telegraf:
                       rename: longitude
 
           topic_parsing:
-            - topic: "devices-queue/+/coordinates"
+            - topic: "${MQTT_TOPIC}/+/coordinates"
               # measurement: "_/_/measurement"
               tags: "_/device/_"
               #fields: "_/_/_"
@@ -115,6 +104,6 @@ telegraf:
           # TODO in configmap
           urls:
             - "http://influxdb"
-          token: tokentoken # "${INFLUXDB_TOKEN}"
+          token: "${INFLUXDB_TOKEN}" # TODO make it works
           organization: "influxdata"
           bucket: "default"

@@ -26,10 +26,8 @@ helm_resource('minio-operator',
 )
 
 # TODO wait for rabbitmq-cluster-operator
-load('ext://namespace', 'namespace_create', 'namespace_inject')
-namespace_create('influxdb-grafana')
-k8s_yaml(helm('./charts/influxdb-grafana', namespace='influxdb-grafana', values=['./charts/influxdb-grafana/values.yaml']))
+k8s_yaml(helm('./charts/influxdb-grafana', values=['./charts/influxdb-grafana/values.yaml']))
 
-docker_build('pedge.io/devices-operator:0.0.1', './operator')
+docker_build('pedge.io/devices-operator:0.0.1', './devices-operator')
 
 k8s_yaml(kustomize ( './devices-operator/config/default'))

@@ -1,0 +1,8 @@
+apiVersion: rabbitmq.com/v1beta1
+kind: Vhost
+metadata:
+  name: test-vhost
+spec:
+  name: / # name of the vhost
+  rabbitmqClusterReference:
+    name: devices-cluster

@@ -4,151 +4,137 @@ kind: ClusterRole
 metadata:
   name: manager-role
 rules:
-  - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
-      - patch
-  - apiGroups:
-      - ""
-    resources:
-      - secrets
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - devices
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - devices/finalizers
-    verbs:
-      - update
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - devices/status
-    verbs:
-      - get
-      - patch
-      - update
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - firmwares
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - firmwares/finalizers
-    verbs:
-      - update
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - firmwares/status
-    verbs:
-      - get
-      - patch
-      - update
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - deviceclusters
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - deviceclusters/finalizers
-    verbs:
-      - update
-  - apiGroups:
-      - devices.pedge.io
-    resources:
-      - deviceclusters/status
-    verbs:
-      - get
-      - patch
-      - update
-  - apiGroups:
-      - minio.min.io
-    resources:
-      - tenants
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - rabbitmq.com
-    resources:
-      - permissions
-      - topicpermissions
-      - users
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - rabbitmq.com
-    resources:
-      - queues
-      - rabbitmqclusters
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - deviceclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - deviceclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - devices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - devices/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - firmwares
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - firmwares/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - minio.min.io
+  resources:
+  - tenants
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rabbitmq.com
+  resources:
+  - permissions
+  - queues
+  - rabbitmqclusters
+  - topicpermissions
+  - users
+  - vhosts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rabbitmq.com
+  resources:
+  - permissions
+  - topicpermissions
+  - users
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
