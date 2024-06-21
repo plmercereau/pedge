@@ -150,6 +150,8 @@ log.console.level = debug
 		},
 	}
 
+	// TODO: rabbitmq operator doesn't allow updates on spec.name and spec.rabbtmqClusterReference -> do not try to update them
+	// TODO we should also block updates on the device cluster name - through a validation webhook
 	vhost := &rabbitmqtopologyv1.Vhost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name + "-default",
