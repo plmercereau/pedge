@@ -32,4 +32,4 @@ k8s_yaml(helm('./charts/influxdb-grafana', namespace='influxdb-grafana', values=
 
 docker_build('pedge.io/devices-operator:0.0.1', './operator')
 
-k8s_yaml(kustomize ( './operator/config/default'))
+k8s_yaml(kustomize ( './devices-operator/config/default'))
