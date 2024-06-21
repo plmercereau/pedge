@@ -38,15 +38,11 @@ telegraf:
   fullnameOverride: telegraf
   tplVersion: 2
   # TODO telegraf should restart if the secret changes
-  # TODO put telegraf into the operator...
-  envFromSecret: device-listener-user-credentials # ! This is the only way to connect to the operator-managed devices cluster
-  # ? https://github.com/influxdata/telegraf/blob/release-1.31/docs/CONFIGURATION.md#secret-store-secrets
-  env:
-    - name: INFLUXDB_TOKEN
-      valueFrom:
-        secretKeyRef:
-          name: influxdb-auth
-          key: admin-token
+  # TODO get the config from influxdb-auth secret, that would be updated by the operator with MQTT credentials
+  # That way, we don't need influxdb/grafana to be in the same namespace as rabbitmq
+  # TODO we also don't need INFLUXDB_URL anymore - update the controller and the CRD
+  # envFromSecret: influxdb-auth
+  envFromSecret: device-listener-user-credentials
 
   config:
     agent:
@@ -101,9 +97,9 @@ telegraf:
 
     outputs:
       - influxdb_v2:
-          # TODO in configmap
           urls:
-            - "http://influxdb"
+            # - "http://influxdb"
+            - "${INFLUXDB_URL}"
           token: "${INFLUXDB_TOKEN}" # TODO make it works
           organization: "influxdata"
           bucket: "default"

@@ -1,12 +1,23 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ? rename to Queue?
 type QueueSpec struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+}
+
+type InfluxDB struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name,omitempty" `
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace,omitempty"` // TODO add default value through a webhook
+	// +kubebuilder:validation:Required
+	SecretReference corev1.LocalObjectReference `json:"secretReference,omitempty"` // TODO default to influxdb-auth
 }
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -16,6 +27,8 @@ type QueueSpec struct {
 type DeviceClusterSpec struct {
 	// +kubebuilder:validation:Required
 	Queue QueueSpec `json:"queue"`
+	// +kubebuilder:validation:Optional
+	InfluxDB InfluxDB `json:"influxdb"`
 }
 
 // DeviceClusterStatus defines the observed state of DeviceCluster

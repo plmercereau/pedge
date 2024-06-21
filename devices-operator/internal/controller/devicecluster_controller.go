@@ -12,11 +12,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -172,13 +177,35 @@ log.console.level = debug
 			Namespace: server.Namespace,
 		},
 		Spec: rabbitmqtopologyv1.QueueSpec{
-			Name: server.Spec.Queue.Name,
-			Vhost: vhost.Name, 
+			Name:  server.Spec.Queue.Name,
+			Vhost: vhost.Name,
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
 				Name:      server.Name,
 				Namespace: server.Namespace,
 			},
 		},
+	}
+	// TODO store MQTT_URL/MQTT_TOPIC in influxdb-auth in the influxdb namespace??
+	// TODO use influxDBSecretVersion as an annotation in telegraf
+	// var influxDBSecretVersion string
+	var influxDBToken string
+	var influxDBPassword string
+	var influxDBURL string
+	useInfluxDB := false
+	if server.Spec.InfluxDB != (pedgev1alpha1.InfluxDB{}) {
+		influxDBSecret := &corev1.Secret{}
+		err := r.Get(ctx, types.NamespacedName{Name: server.Spec.InfluxDB.SecretReference.Name, Namespace: server.Spec.InfluxDB.Namespace}, influxDBSecret)
+		if err != nil {
+			// If a secret name is provided, then it must exist
+			// TODO in such cases, create an Event for the user to understand why their reconcile is failing.
+			return err
+		}
+
+		useInfluxDB = true
+		// influxDBSecretVersion = influxDBSecret.ResourceVersion
+		influxDBToken = string(influxDBSecret.Data["admin-token"])
+		influxDBPassword = string(influxDBSecret.Data["admin-password"])
+		influxDBURL = fmt.Sprintf("http://%s.%s.svc", server.Spec.InfluxDB.Name, server.Spec.InfluxDB.Namespace)
 	}
 
 	var listenerSecret corev1.Secret
@@ -186,15 +213,26 @@ log.console.level = debug
 	mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", server.Name, server.Namespace, "1883")
 	mqttTopic := server.Spec.Queue.Name
 	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: server.Namespace}, &listenerSecret); err != nil {
+		data := map[string][]byte{
+			"username":   []byte(listenerUserName),
+			"password":   []byte(generateRandomPassword(16)),
+			"MQTT_URL":   []byte(mqttUrl),
+			"MQTT_TOPIC": []byte(mqttTopic),
+		}
+		if useInfluxDB {
+			data["INFLUXDB_TOKEN"] = []byte(influxDBToken)
+			data["INFLUXDB_PASSWORD"] = []byte(influxDBPassword)
+			data["INFLUXDB_URL"] = []byte(influxDBURL)
+		}
 		listenerSecret = corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,
 				Namespace: server.Namespace,
 			},
 			Data: map[string][]byte{
-				"username": []byte(listenerUserName),
-				"password": []byte(generateRandomPassword(16)),
-				"MQTT_URL": []byte(mqttUrl),
+				"username":   []byte(listenerUserName),
+				"password":   []byte(generateRandomPassword(16)),
+				"MQTT_URL":   []byte(mqttUrl),
 				"MQTT_TOPIC": []byte(mqttTopic),
 			},
 		}
@@ -203,7 +241,7 @@ log.console.level = debug
 			return err
 		}
 	} else {
-		changed := false		
+		changed := false
 		if listenerSecret.Data["MQTT_URL"] == nil || string(listenerSecret.Data["MQTT_URL"]) != mqttUrl {
 			listenerSecret.Data["MQTT_URL"] = []byte(mqttUrl)
 			changed = true
@@ -212,6 +250,21 @@ log.console.level = debug
 			listenerSecret.Data["MQTT_TOPIC"] = []byte(mqttTopic)
 			changed = true
 		}
+		if useInfluxDB {
+			if listenerSecret.Data["INFLUXDB_TOKEN"] == nil || string(listenerSecret.Data["INFLUXDB_TOKEN"]) != influxDBToken {
+				listenerSecret.Data["INFLUXDB_TOKEN"] = []byte(influxDBToken)
+				changed = true
+			}
+			if listenerSecret.Data["INFLUXDB_PASSWORD"] == nil || string(listenerSecret.Data["INFLUXDB_PASSWORD"]) != influxDBPassword {
+				listenerSecret.Data["INFLUXDB_PASSWORD"] = []byte(influxDBPassword)
+				changed = true
+			}
+			if listenerSecret.Data["INFLUXDB_URL"] == nil || string(listenerSecret.Data["INFLUXDB_URL"]) != influxDBURL {
+				listenerSecret.Data["INFLUXDB_URL"] = []byte(influxDBURL)
+				changed = true
+			}
+		}
+
 		if changed {
 			if err := r.Update(ctx, &listenerSecret); err != nil {
 				return err
@@ -279,7 +332,7 @@ log.console.level = debug
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
 				Write:    "",
-				Read: fmt.Sprintf("^%s\\..+$", server.Spec.Queue.Name),
+				Read:     fmt.Sprintf("^%s\\..+$", server.Spec.Queue.Name),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
 				Name:      server.Name,
@@ -374,5 +427,34 @@ func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client
 func (r *DeviceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.DeviceCluster{}).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForInfluxSecret),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+func (r *DeviceClusterReconciler) findObjectsForInfluxSecret(ctx context.Context, secret client.Object) []reconcile.Request {
+	attachedDevices := &pedgev1alpha1.FirmwareList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.AndSelectors(
+			fields.OneTermEqualSelector(".spec.influxDB.secretReference.name", secret.GetName()),
+			fields.OneTermEqualSelector(".spec.influxDB.namespace", secret.GetNamespace())),
+	}
+	err := r.List(ctx, attachedDevices, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(attachedDevices.Items))
+	for i, item := range attachedDevices.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
 }

@@ -11,3 +11,8 @@ metadata:
 spec:
   queue:
     name: esp-queue
+  influxdb:
+    name: influxdb
+    namespace: default
+    secretReference:
+      name: influxdb-auth
