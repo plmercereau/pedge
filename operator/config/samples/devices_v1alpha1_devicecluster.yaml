@@ -1,13 +1,13 @@
 apiVersion: devices.pedge.io/v1alpha1
-kind: MQTTServer
+kind: DeviceCluster
 metadata:
   labels:
-    app.kubernetes.io/name: mqttserver
-    app.kubernetes.io/instance: mqttserver-sample
+    app.kubernetes.io/name: devicecluster
+    app.kubernetes.io/instance: devicecluster-sample
     app.kubernetes.io/part-of: pedge-devices-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: pedge-devices-operator
-  name: esp-cluster
+  name: devices-cluster
 spec:
   queue:
     name: esp-queue

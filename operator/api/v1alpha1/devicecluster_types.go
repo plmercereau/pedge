@@ -12,14 +12,14 @@ type QueueSpec struct {
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// MQTTServerSpec defines the desired state of MQTTServer
-type MQTTServerSpec struct {
+// DeviceClusterSpec defines the desired state of DeviceCluster
+type DeviceClusterSpec struct {
 	// +kubebuilder:validation:Required
 	Queue QueueSpec `json:"queue"`
 }
 
-// MQTTServerStatus defines the observed state of MQTTServer
-type MQTTServerStatus struct {
+// DeviceClusterStatus defines the observed state of DeviceCluster
+type DeviceClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -27,24 +27,24 @@ type MQTTServerStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// MQTTServer is the Schema for the mqttservers API
-type MQTTServer struct {
+// DeviceCluster is the Schema for the deviceclusters API
+type DeviceCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MQTTServerSpec   `json:"spec,omitempty"`
-	Status MQTTServerStatus `json:"status,omitempty"`
+	Spec   DeviceClusterSpec   `json:"spec,omitempty"`
+	Status DeviceClusterStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// MQTTServerList contains a list of MQTTServer
-type MQTTServerList struct {
+// DeviceClusterList contains a list of DeviceCluster
+type DeviceClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MQTTServer `json:"items"`
+	Items           []DeviceCluster `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&MQTTServer{}, &MQTTServerList{})
+	SchemeBuilder.Register(&DeviceCluster{}, &DeviceClusterList{})
 }

@@ -26,31 +26,31 @@ const deviceClusterSecretSuffix = "-device-cluster"
 const bucketName = "firmwares"
 const bucketRegion = "default"
 
-// MQTTServerReconciler reconciles a MQTTServer object
-type MQTTServerReconciler struct {
+// DeviceClusterReconciler reconciles a DeviceCluster object
+type DeviceClusterReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=mqttservers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=mqttservers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=mqttservers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rabbitmq.com,resources=rabbitmqclusters;queues,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=minio.min.io,resources=tenants,verbs=get;list;watch;create;update;patch;delete
 
-func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// Fetch the MQTTServer instance
-	server := &pedgev1alpha1.MQTTServer{}
+	// Fetch the DeviceCluster instance
+	server := &pedgev1alpha1.DeviceCluster{}
 	err := r.Get(ctx, req.NamespacedName, server)
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "unable to fetch MQTTServer")
+		logger.Error(err, "unable to fetch DeviceCluster")
 		return ctrl.Result{}, err
 	}
 
@@ -117,11 +117,11 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	}
 
-	// Check if the MQTTServer is marked for deletion
+	// Check if the DeviceCluster is marked for deletion
 	if server.GetDeletionTimestamp() != nil {
 		if containsString(server.GetFinalizers(), deviceFinalizer) {
 			// Finalize the server
-			if err := r.finalizeMQTTServer(ctx, server); err != nil {
+			if err := r.finalizeDeviceCluster(ctx, server); err != nil {
 				return ctrl.Result{}, err
 			}
 			// Remove finalizer
@@ -149,8 +149,8 @@ func (r *MQTTServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-// finalizeMQTTServer handles cleanup logic when a MQTTServer is deleted
-func (r *MQTTServerReconciler) finalizeMQTTServer(ctx context.Context, server *pedgev1alpha1.MQTTServer) error {
+// finalizeDeviceCluster handles cleanup logic when a DeviceCluster is deleted
+func (r *DeviceClusterReconciler) finalizeDeviceCluster(ctx context.Context, server *pedgev1alpha1.DeviceCluster) error {
 	resources := []client.Object{
 		&rabbitmqv1.RabbitmqCluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -181,14 +181,14 @@ func (r *MQTTServerReconciler) finalizeMQTTServer(ctx context.Context, server *p
 }
 
 // syncResources creates or updates the associated resources
-func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *pedgev1alpha1.MQTTServer) error {
+func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *pedgev1alpha1.DeviceCluster) error {
 	// Define the desired RabbitMQ Cluster resource
 	cluster := &rabbitmqv1.RabbitmqCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name,
 			Namespace: server.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("MQTTServer")),
+				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
 			},
 		},
 		Spec: rabbitmqv1.RabbitmqClusterSpec{
@@ -206,7 +206,7 @@ func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *pedgev
 			Name:      server.Name,
 			Namespace: server.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("MQTTServer")),
+				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
 			},
 		},
 		Spec: rabbitmqtopologyv1.QueueSpec{
@@ -225,7 +225,7 @@ func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *pedgev
 			Name:      server.Name,
 			Namespace: server.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("MQTTServer")),
+				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
 			},
 		},
 		Spec: miniov2.TenantSpec{
@@ -274,7 +274,7 @@ func (r *MQTTServerReconciler) syncResources(ctx context.Context, server *pedgev
 }
 
 // CreateOrUpdate creates or updates a resource
-func (r *MQTTServerReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
+func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
 	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 	existing := obj.DeepCopyObject().(client.Object)
 	err := r.Get(ctx, key, existing)
@@ -304,8 +304,8 @@ func (r *MQTTServerReconciler) CreateOrUpdate(ctx context.Context, obj client.Ob
 }
 
 // SetupWithManager sets up the controller with the Manager
-func (r *MQTTServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DeviceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&pedgev1alpha1.MQTTServer{}).
+		For(&pedgev1alpha1.DeviceCluster{}).
 		Complete(r)
 }

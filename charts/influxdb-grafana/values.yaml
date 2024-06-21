@@ -50,12 +50,12 @@ telegraf:
     - name: MQTT_USER
       valueFrom:
         secretKeyRef:
-          name: esp-cluster-default-user
+          name: devices-cluster-default-user
           key: username
     - name: MQTT_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: esp-cluster-default-user
+          name: devices-cluster-default-user
           key: password
   config:
     agent:
@@ -85,11 +85,11 @@ telegraf:
       - mqtt_consumer:
           servers:
             # TODO in configmap
-            - "tcp://esp-cluster:1883"
+            - "tcp://devices-cluster:1883"
           username: "${MQTT_USER}"
           password: "${MQTT_PASSWORD}"
           topics:
-            - "esp-queue/+/coordinates"
+            - "devices-queue/+/coordinates"
           data_format: "json_v2" # TODO https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
           # data_format: "json"
           json_v2:
@@ -103,7 +103,7 @@ telegraf:
                       rename: longitude
 
           topic_parsing:
-            - topic: "esp-queue/+/coordinates"
+            - topic: "devices-queue/+/coordinates"
               # measurement: "_/_/measurement"
               tags: "_/device/_"
               #fields: "_/_/_"

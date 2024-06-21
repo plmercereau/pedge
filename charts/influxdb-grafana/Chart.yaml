@@ -1,6 +1,6 @@
 apiVersion: v2
-name: esp-cluster
-description: A Helm chart for managing a cluster of ESP32 devices
+name: influxdb-grafana
+description: A Helm chart for installing InfluxDB and Grafana, and connecting them.
 type: application
 version: 0.1.0
 dependencies:

@@ -12,6 +12,6 @@ spec:
   builder:
     image:
       registry: plmercereau
-      repository: esp-monitor-builder
+      repository: firmware-builder-esp32-sim7600
       tag: latest
       pullPolicy: Always

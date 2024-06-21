@@ -7,7 +7,7 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type MQTTServerReference struct {
+type DeviceClusterReference struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name,omitempty"`
 }
@@ -20,7 +20,7 @@ type FirmwareReference struct {
 // DeviceSpec defines the desired state of Device
 type DeviceSpec struct {
 	// +kubebuilder:validation:Required
-	MQTTServerReference MQTTServerReference `json:"mqttServerReference"`
+	DeviceClusterReference DeviceClusterReference `json:"deviceClusterReference"`
 	// +kubebuilder:validation:Optional
 	FirmwareReference FirmwareReference `json:"firmwareReference,omitempty"`
 }

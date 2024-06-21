@@ -30,7 +30,7 @@ import (
 	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 )
 
-var _ = Describe("MQTTServer Controller", func() {
+var _ = Describe("DeviceCluster Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("MQTTServer Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		mqttserver := &pedgev1alpha1.MQTTServer{}
+		devicecluster := &pedgev1alpha1.DeviceCluster{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind MQTTServer")
-			err := k8sClient.Get(ctx, typeNamespacedName, mqttserver)
+			By("creating the custom resource for the Kind DeviceCluster")
+			err := k8sClient.Get(ctx, typeNamespacedName, devicecluster)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &pedgev1alpha1.MQTTServer{
+				resource := &pedgev1alpha1.DeviceCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("MQTTServer Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &pedgev1alpha1.MQTTServer{}
+			resource := &pedgev1alpha1.DeviceCluster{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance MQTTServer")
+			By("Cleanup the specific resource instance DeviceCluster")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &MQTTServerReconciler{
+			controllerReconciler := &DeviceClusterReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

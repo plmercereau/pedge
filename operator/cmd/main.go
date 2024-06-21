@@ -137,11 +137,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Device")
 		os.Exit(1)
 	}
-	if err = (&controller.MQTTServerReconciler{
+	if err = (&controller.DeviceClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MQTTServer")
+		setupLog.Error(err, "unable to create controller", "controller", "DeviceCluster")
 		os.Exit(1)
 	}
 	if err = (&controller.FirmwareReconciler{

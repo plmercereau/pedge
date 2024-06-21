@@ -1,4 +1,4 @@
-name: Buil ESP-Monitor Builder Image
+name: Build esp32-sim7600 firmware builder
 
 on:
   # pull_request:
@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 env:
-  package_name: esp-monitor
+  package_name: esp32-sim7600
 
 jobs:
   build:
@@ -29,8 +29,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: esp-monitor
-          tags: plmercereau/esp-monitor-builder:latest
+          context: firmware-builders/esp32-sim7600
+          tags: plmercereau/firmware-builder-esp32-sim7600:latest
           push: true
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha

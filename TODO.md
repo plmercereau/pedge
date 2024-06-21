@@ -1,14 +1,9 @@
-- Operator
+- endpoint: get information from loadbalancer
+- move netboot stuff to another repo
+- Integrate telegraf/influxdb2/grafana
 
-  - Rename "MQTTServer" to "DeviceCluster"
-    - endpoint: get information from loadbalancer
-  - Rename "esp\*" to mcu
-  - Rename device to mcu? think about the same system for sbc. maybe a "type: mcu" field in the crd. then device is ok
-  - move netboot stuff to another repo
-  - Integrate telegraf/influxdb2/grafana
-    - dedicated chart
-    - https://helm.sh/docs/chart_template_guide/yaml_techniques/#yaml-anchors
-    - move charts/esp-cluster to operator/helm-charts?
+  - dedicated chart
+  - https://helm.sh/docs/chart_template_guide/yaml_techniques/#yaml-anchors
 
 - configure influxdb/grafana
   - Grafana map
@@ -19,6 +14,11 @@
   - download firmwares
   - installation script (if possible)
 
+## Next
+
+- secure firmware - efuse etc
+- OTA upgrades over MQTT/HTTPS
+  - https://chatgpt.com/share/c35ae778-766e-41ca-adc1-1f3021af7fd8
 - OperatorHub / OLM
   - [x] cert-manager
   - [x] rabbitmq
@@ -27,9 +27,3 @@
   - [ ] influxdb2
   - [ ] telegraf
   - [x] minio
-
-## Next
-
-- secure firmware - efuse etc
-- OTA upgrades over MQTT/HTTPS
-  - https://chatgpt.com/share/c35ae778-766e-41ca-adc1-1f3021af7fd8

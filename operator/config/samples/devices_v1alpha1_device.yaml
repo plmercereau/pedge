@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/created-by: pedge-devices-operator
   name: device-sample
 spec:
-  mqttServerReference:
-    name: esp-cluster
+  deviceClusterReference:
+    name: devices-cluster
   firmwareReference:
     name: firmware-sample

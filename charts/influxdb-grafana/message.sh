@@ -10,25 +10,25 @@ RANDOM_NUMBER=$(( ( RANDOM % 15 ) + 1 ))
 
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
-    publish esp-queue/brussels/coordinates \
+    publish devices-queue/brussels/coordinates \
     '{ "latitude": 50.850346, "longitude": 4.851721 }'
 sleep $SLEEP
 
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
-    publish esp-queue/test/coordinates \
+    publish devices-queue/test/coordinates \
     '{ "latitude": 50.0, "longitude": 3.0 }'
 sleep $SLEEP
 
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
-    publish esp-queue/paris/coordinates \
+    publish devices-queue/paris/coordinates \
     '{ "latitude": 48.864716, "longitude": 2.349014 }'
 sleep $SLEEP
 
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
-    publish esp-queue/paris/coordinates \
+    publish devices-queue/paris/coordinates \
     '{ "latitude": 48.964716, "longitude": 2.349014 }'
 sleep $SLEEP
 

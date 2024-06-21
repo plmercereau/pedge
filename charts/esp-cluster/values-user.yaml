@@ -1,7 +1,0 @@
-grafana:
-  ingress:
-    enabled: true
-    ingressClassName: traefik
-
-telegraf:
-  envFromSecret: esp-cluster-listener-credentials # * mqtt user/password/token/url(host+port)/(queue?)
