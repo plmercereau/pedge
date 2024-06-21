@@ -1,17 +1,16 @@
 - endpoint: get information from loadbalancer
 - move netboot stuff to another repo
-- Integrate telegraf/influxdb2/grafana
-
-  - dedicated chart
-  - https://helm.sh/docs/chart_template_guide/yaml_techniques/#yaml-anchors
-
-- configure influxdb/grafana
-  - Grafana map
+- publish the operator image
+- publish the influx/grafana helm chart
+- develop and publish an operator helm chart
+- dedicated influxdb user for grafana
+- dedicated minio user
 - develop a rancher UI interface
 
   - CRUD devices
   - firmware build status
   - download firmwares
+  - automate script for flashing devices
   - installation script (if possible)
 
 ## Next
