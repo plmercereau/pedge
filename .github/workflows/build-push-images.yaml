@@ -7,7 +7,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  OWNER: ${{ github.repository_owner }}
 
 jobs:
   generate-matrix:
@@ -60,14 +59,14 @@ jobs:
           context: ${{ matrix.context }}
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.name }}:${{ matrix.version }}
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.name }}:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}:${{ matrix.version }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}:latest
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.github.repository_owner}}/${{matrix.name}}
+          subject-name: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
