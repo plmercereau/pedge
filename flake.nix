@@ -49,7 +49,8 @@
                   ngrok
                   # operator-sdk # package not working
                   kustomize
-                  yq
+                  yq-go
+                  act
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                   (
                     # TODO not working for other architectures...

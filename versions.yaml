@@ -1,9 +1,8 @@
-firmware-builders/esp32-sim7600:
+- context: firmware-builders/esp32-sim7600
   repository: plmercereau
   name: firmware-builder-esp32-sim7600
   version: 0.0.1
-
-devices-operator:
+- context: devices-operator
   repository: plmercereau
   name: devices-operator
   version: 0.0.1
