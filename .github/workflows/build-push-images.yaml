@@ -23,6 +23,7 @@ jobs:
   build-and-push:
     needs: generate-matrix
     runs-on: ubuntu-latest
+    name: ${{ matrix.name }}
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.include) }}
