@@ -14,11 +14,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Parse version.yaml
+      - name: Parse versions.yaml
         id: parse_yaml
         uses: mikefarah/yq@v4
         with:
-          cmd: cat version.yaml
+          cmd: cat versions.yaml
           output: json
 
       - id: set-matrix
