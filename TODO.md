@@ -1,4 +1,3 @@
-- publish the operator image
 - publish the influx/grafana helm chart
 - develop and publish an operator helm chart
 - rename mqtt.queue.name to mqtt.sensorsTopic

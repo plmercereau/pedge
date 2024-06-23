@@ -1,3 +1,4 @@
+# TODO Readme on docker hub / ghcr.io
 name: Build and Push Images
 
 on:
