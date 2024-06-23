@@ -24,7 +24,7 @@ jobs:
       - id: set-matrix
         run: |
           matrix=$(echo '${{ steps.parse_yaml.outputs.result }}' | jq -c 'to_entries | map({context: .key, name: .value.name, version: .value.version})')
-          echo "::set-output name=matrix::$matrix"
+          echo "matrix=$matrix" >> $GITHUB_ENV
 
   build-and-push:
     needs: generate-matrix
