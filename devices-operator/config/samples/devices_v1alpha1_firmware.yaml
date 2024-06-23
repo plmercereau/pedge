@@ -11,7 +11,7 @@ metadata:
 spec:
   builder:
     image:
-      registry: plmercereau
-      repository: firmware-builder-esp32-sim7600
+      registry: ghcr.io
+      repository: plmercereau/firmware-builder-esp32-sim7600
       tag: latest
       pullPolicy: Always
