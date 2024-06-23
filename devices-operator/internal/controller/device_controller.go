@@ -275,6 +275,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 				},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
+						// By setting the annotation, we make sure that the Job is re-triggered when the firmware changes
 						// Re-trigger the job when the firmware, secret changes or service changes
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{

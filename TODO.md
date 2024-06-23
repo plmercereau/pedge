@@ -1,4 +1,3 @@
-
 - publish the operator image
 - publish the influx/grafana helm chart
 - develop and publish an operator helm chart
@@ -13,10 +12,11 @@
   - installation script (if possible)
 
 ## Backlog
-  - k8s events in controllers
-  - move netboot stuff to another repo
-  - dedicated influxdb user for grafana
-  - dedicated minio user
+
+- k8s events in controllers
+- move netboot stuff to another repo
+- dedicated influxdb user for grafana
+- dedicated minio user
 
 ## Next
 
