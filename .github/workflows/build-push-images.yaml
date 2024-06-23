@@ -14,23 +14,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Parse versions.yaml
+      - name: Parse version.yaml
         id: parse_yaml
         uses: mikefarah/yq@v4
         with:
-          cmd: cat versions.yaml
+          cmd: cat version.yaml
           output: json
 
       - id: set-matrix
         run: |
-          matrix=$(echo ${{ steps.parse_yaml.outputs.result }} | jq -c 'to_entries | map({context: .key, name: .value.name, version: .value.version})')
+          matrix=$(echo '${{ steps.parse_yaml.outputs.result }}' | jq -c 'to_entries | map({context: .key, name: .value.name, version: .value.version})')
           echo "::set-output name=matrix::$matrix"
 
   build-and-push:
     needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+      matrix:
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -52,6 +53,6 @@ jobs:
           file: ${{ matrix.context }}/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ghcr.io/${{ github.repository }}/{{ matrix.name }}:${{ matrix.version }}
-            ghcr.io/${{ github.repository }}/{{ matrix.name }}:latest
+            ghcr.io/${{ github.repository }}/${{ matrix.name }}:${{ matrix.version }}
+            ghcr.io/${{ github.repository }}/${{ matrix.name }}:latest
           push: true
