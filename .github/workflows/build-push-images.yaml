@@ -20,9 +20,9 @@ jobs:
       - name: Parse versions.yaml
         id: set-matrix
         run: |
-          images=$(yq -o=json '.[] | select(has("dockerContext"))' versions.yaml -I 0)
+          images=$(yq -o=json '[.[] | select(has("dockerContext"))]' versions.yaml -I 0)
           echo "images=$images" >> "$GITHUB_OUTPUT"
-          charts=$(yq -o=json '.[] | select(has("helmContext"))' versions.yaml -I 0)
+          charts=$(yq -o=json '[.[] | select(has("helmContext"))]' versions.yaml -I 0)
           echo "charts=$charts" >> "$GITHUB_OUTPUT"
 
   build-and-push-images:
