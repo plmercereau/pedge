@@ -84,7 +84,8 @@ jobs:
   publish-charts:
     needs:
       - generate-matrix
-      - build-and-push-images
+      # TODO add the dependency again
+      # - build-and-push-images
     runs-on: ubuntu-latest
     name: "Chart: ${{ matrix.name }}"
     strategy:
@@ -98,7 +99,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      - name: Install Helm
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: helm
+          version: 1.0
       - name: test
         run: |
           echo "test"
