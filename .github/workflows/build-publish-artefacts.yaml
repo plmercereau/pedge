@@ -99,8 +99,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      # - name: Install Helm
-      #   run: sudo apt-get install helm -y
       - name: test
         run: |
           echo "test"
