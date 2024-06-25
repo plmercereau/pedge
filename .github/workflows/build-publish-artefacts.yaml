@@ -1,5 +1,5 @@
 # TODO Readme on docker hub / ghcr.io
-name: Build and Push Images
+name: Build and Publish artefacts
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
     name: ${{ matrix.name }}
     strategy:
       matrix:
-        include: ${{ fromJson(needs.generate-matrix.outputs.include) }}
+        include: ${{ fromJson(needs.generate-matrix.outputs.images) }}
     permissions:
       contents: read
       packages: write
