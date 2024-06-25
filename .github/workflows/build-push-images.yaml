@@ -11,7 +11,8 @@ jobs:
     name: Generate matrix
     runs-on: ubuntu-latest
     outputs:
-      include: ${{ steps.set-matrix.outputs.include }}
+      images: ${{ steps.set-matrix.outputs.images }}
+      charts: ${{ steps.set-matrix.outputs.charts }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,10 +20,12 @@ jobs:
       - name: Parse versions.yaml
         id: set-matrix
         run: |
-          include=$(cat versions.yaml| yq -o=json '.' -I 0)
-          echo "include=$include" >> "$GITHUB_OUTPUT"
+          images=$(yq -o=json '.[] | select(has("dockerContext"))' versions.yaml -I 0)
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+          charts=$(yq -o=json '.[] | select(has("helmContext"))' versions.yaml -I 0)
+          echo "charts=$charts" >> "$GITHUB_OUTPUT"
 
-  build-and-push:
+  build-and-push-images:
     needs: generate-matrix
     runs-on: ubuntu-latest
     name: ${{ matrix.name }}
@@ -61,7 +64,7 @@ jobs:
         uses: docker/build-push-action@v5
         id: push
         with:
-          context: ${{ matrix.context }}
+          context: ${{ matrix.dockerContext }}
           platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ matrix.version }}
@@ -77,3 +80,24 @@ jobs:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  publish-charts:
+    needs: generate-matrix
+    runs-on: ubuntu-latest
+    name: ${{ matrix.name }}
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.generate-matrix.outputs.charts) }}
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: test
+        run: |
+          echo "test"
+          echo ${{ matrix.helmContext }}

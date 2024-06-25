@@ -1,6 +1,7 @@
-- context: firmware-builders/esp32-sim7600
-  name: firmware-builder-esp32-sim7600
+- name: firmware-builder-esp32-sim7600
+  dockerContext: firmware-builders/esp32-sim7600
   version: 0.0.1
-- context: devices-operator
-  name: devices-operator
+- name: devices-operator
+  dockerContext: devices-operator
+  helmContext: devices-operator
   version: 0.0.1
