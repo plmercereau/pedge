@@ -28,7 +28,7 @@ jobs:
   build-and-push-images:
     needs: generate-matrix
     runs-on: ubuntu-latest
-    name: ${{ matrix.name }}
+    name: "Image: ${{ matrix.name }}"
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.images) }}
@@ -84,7 +84,7 @@ jobs:
   publish-charts:
     needs: generate-matrix
     runs-on: ubuntu-latest
-    name: ${{ matrix.name }}
+    name: "Chart: ${{ matrix.name }}"
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.charts) }}
