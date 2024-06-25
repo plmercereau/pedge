@@ -3,5 +3,8 @@
   version: 0.0.1
 - name: devices-operator
   dockerContext: devices-operator
-  helmContext: devices-operator
+  helmContext: charts/devices-operator
+  version: 0.0.1
+- name: influxdb-grafana
+  helmContext: charts/influxdb-grafana
   version: 0.0.1
