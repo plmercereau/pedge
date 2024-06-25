@@ -82,7 +82,9 @@ jobs:
           push-to-registry: true
 
   publish-charts:
-    needs: generate-matrix
+    needs:
+      - generate-matrix
+      - build-and-push-images
     runs-on: ubuntu-latest
     name: "Chart: ${{ matrix.name }}"
     strategy:
