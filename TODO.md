@@ -1,6 +1,5 @@
 - publish the influx/grafana helm chart
 - develop and publish an operator helm chart
-- rename mqtt.queue.name to mqtt.sensorsTopic
 
 - develop a rancher UI interface
 
@@ -19,6 +18,8 @@
 
 ## Next
 
+- review the firmware build/flash system
+  - store secrets using NVS / efuse
 - secure firmware - efuse etc
 - OTA upgrades over MQTT/HTTPS
   - https://chatgpt.com/share/c35ae778-766e-41ca-adc1-1f3021af7fd8

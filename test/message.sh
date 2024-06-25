@@ -2,7 +2,7 @@
 
 NAMESPACE=default
 CLUSTER_NAME=devices-cluster
-QUEUE_NAME=esp-queue
+TOPIC=sensors
 
 SECRET=$CLUSTER_NAME-default-user
 # SECRET=device-sample-user-credentials
@@ -16,25 +16,25 @@ RANDOM_NUMBER=$(( ( RANDOM % 15 ) + 1 ))
 
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
-    publish $QUEUE_NAME/brussels/coordinates \
+    publish $TOPIC/brussels/coordinates \
     '{ "latitude": 50.850346, "longitude": 4.851721 }'
 sleep $SLEEP
 
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
-    publish $QUEUE_NAME/test/coordinates \
+    publish $TOPIC/test/coordinates \
     '{ "latitude": 50.0, "longitude": 3.0 }'
 sleep $SLEEP
 
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
-    publish $QUEUE_NAME/paris/coordinates \
+    publish $TOPIC/paris/coordinates \
     '{ "latitude": 48.864716, "longitude": 2.349014 }'
 sleep $SLEEP
 
 mqttui -b mqtt://localhost -u $USER \
     --password "$PASSWORD" \
-    publish $QUEUE_NAME/paris/coordinates \
+    publish $TOPIC/paris/coordinates \
     '{ "latitude": 48.964716, "longitude": 2.349014 }'
 sleep $SLEEP
 

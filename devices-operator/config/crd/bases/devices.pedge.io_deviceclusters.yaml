@@ -49,16 +49,13 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                 type: object
-              queue:
-                description: '? rename to Queue?'
+              mqtt:
                 properties:
-                  name:
+                  sensorsTopic:
                     type: string
-                required:
-                - name
                 type: object
             required:
-            - queue
+            - mqtt
             type: object
           status:
             description: DeviceClusterStatus defines the observed state of DeviceCluster

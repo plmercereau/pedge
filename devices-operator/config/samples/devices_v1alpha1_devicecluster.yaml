@@ -9,8 +9,8 @@ metadata:
     app.kubernetes.io/created-by: pedge-devices-operator
   name: devices-cluster
 spec:
-  queue:
-    name: esp-queue
+  mqtt:
+    sensorsTopic: sensors
   influxdb:
     name: influxdb
     namespace: default

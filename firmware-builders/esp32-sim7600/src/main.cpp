@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 
 // TODO custom topic
-#define TOPIC_SENSORS "esp-queue"
+#define TOPIC_SENSORS "sensors"
 
 const String clientId = String(DEVICE_NAME) + "-" + getESP32ChipID();
 

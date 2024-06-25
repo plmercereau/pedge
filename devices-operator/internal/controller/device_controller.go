@@ -26,12 +26,12 @@ import (
 )
 
 const (
-	// The suffix should not change: the rabbitmq operator takes ownership of it, 
+	// The suffix should not change: the rabbitmq operator takes ownership of it,
 	// and still creates a -user-credentials secret even when asked otherwise. Investigate.
-	deviceSecretSuffix        = "-user-credentials"
-	secretNameLabel           = "pedge.io/secret-name"
-	secretVersionAnnotation   = "pedge.io/secret-version"
-	serviceAnnotation  = "pedge.io/service"
+	deviceSecretSuffix      = "-user-credentials"
+	secretNameLabel         = "pedge.io/secret-name"
+	secretVersionAnnotation = "pedge.io/secret-version"
+	serviceAnnotation       = "pedge.io/service"
 )
 
 // DeviceReconciler reconciles a Device object
@@ -216,9 +216,9 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 			},
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
-				Write:    fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.Queue.Name, device.Name),
+				Write:    fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic, device.Name),
 				// TODO narrow down the read permissions: the device should only be able to write to its own topic
-				Read: fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.Queue.Name, device.Name),
+				Read: fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic, device.Name),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
 				Name:      deviceCluster.Name,
@@ -280,8 +280,8 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								// We don't need annotate changes in the firmare as for now only the builder image can change
-								secretVersionAnnotation:   secretVersion,
-								serviceAnnotation: fmt.Sprintf("%s:%s", mqttBroker, mqttPort),
+								secretVersionAnnotation: secretVersion,
+								serviceAnnotation:       fmt.Sprintf("%s:%s", mqttBroker, mqttPort),
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -440,7 +440,7 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.Device{}).
-		// TODO Watch DeviceCluster, too (the queue name can change)
+		// TODO Watch DeviceCluster, too (the sensors topic name can change)
 		// Watch for changes in the secret of the device
 		Watches(
 			&corev1.Secret{},

@@ -5,10 +5,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ? rename to Queue?
-type QueueSpec struct {
+type MQTTSpec struct {
 	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	SensorsTopic string `json:"sensorsTopic,omitempty"`
 }
 
 type InfluxDB struct {
@@ -24,7 +23,7 @@ type InfluxDB struct {
 // DeviceClusterSpec defines the desired state of DeviceCluster
 type DeviceClusterSpec struct {
 	// +kubebuilder:validation:Required
-	Queue QueueSpec `json:"queue"`
+	MQTT MQTTSpec `json:"mqtt"`
 	// +kubebuilder:validation:Optional
 	InfluxDB InfluxDB `json:"influxdb"`
 }

@@ -183,7 +183,7 @@ log.console.level = debug
 			Namespace: server.Namespace,
 		},
 		Spec: rabbitmqtopologyv1.QueueSpec{
-			Name:  server.Spec.Queue.Name,
+			Name:  server.Spec.MQTT.SensorsTopic,
 			Vhost: vhost.Name,
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
 				Name:      server.Name,
@@ -235,7 +235,7 @@ log.console.level = debug
 		}
 
 		changed := false
-		
+
 		// Add reloader.stakater.com/match: "true" to the secret to trigger a reload of the telegraf config
 		if influxDBSecret.Annotations == nil {
 			influxDBSecret.Annotations = make(map[string]string)
@@ -245,7 +245,7 @@ log.console.level = debug
 				changed = true
 			}
 		}
-		
+
 		if influxDBSecret.Data["MQTT_USERNAME"] == nil || string(influxDBSecret.Data["MQTT_USERNAME"]) != listenerUserName {
 			influxDBSecret.Data["MQTT_USERNAME"] = []byte(listenerUserName)
 			changed = true
@@ -254,8 +254,8 @@ log.console.level = debug
 			influxDBSecret.Data["MQTT_PASSWORD"] = listenerSecret.Data["password"]
 			changed = true
 		}
-		if influxDBSecret.Data["MQTT_TOPIC"] == nil || string(influxDBSecret.Data["MQTT_TOPIC"]) != server.Spec.Queue.Name {
-			influxDBSecret.Data["MQTT_TOPIC"] = []byte(server.Spec.Queue.Name)
+		if influxDBSecret.Data["MQTT_TOPIC"] == nil || string(influxDBSecret.Data["MQTT_TOPIC"]) != server.Spec.MQTT.SensorsTopic {
+			influxDBSecret.Data["MQTT_TOPIC"] = []byte(server.Spec.MQTT.SensorsTopic)
 			changed = true
 		}
 		mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", server.Name, server.Namespace, "1883")
@@ -336,7 +336,7 @@ log.console.level = debug
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
 				Write:    "",
-				Read:     fmt.Sprintf("^%s\\..+$", server.Spec.Queue.Name),
+				Read:     fmt.Sprintf("^%s\\..+$", server.Spec.MQTT.SensorsTopic),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
 				Name:      server.Name,

@@ -4,4 +4,4 @@ grafana:
     ingressClassName: traefik
 
 telegraf:
-  envFromSecret: devices-cluster-listener-credentials # * mqtt user/password/token/url(host+port)/(queue?)
+  envFromSecret: devices-cluster-listener-credentials # * mqtt user/password/token/url(host+port)/(sensorsTopic?)
