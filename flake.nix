@@ -42,7 +42,8 @@
                 pre-commit.hooks.make-device-operator-helm = {
                   enable = true;
                   name = "Generate the Device Operator Helm chart";
-                  entry = "bash -c 'cd devices-operator && make helm'";
+                  # entry = "bash -c 'cd devices-operator && make helm'";
+                  entry = "exit 1";
                   files = "^devices-operator/";
                   types = ["go" "yaml"];
                   pass_filenames = false;

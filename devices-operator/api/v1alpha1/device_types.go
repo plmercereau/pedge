@@ -25,7 +25,7 @@ type DeviceSpec struct {
 // DeviceStatus defines the observed state of Device
 type DeviceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+
 }
 
 //+kubebuilder:object:root=true
