@@ -2,7 +2,7 @@ apiVersion: v2
 name: influxdb-grafana
 description: A Helm chart for installing InfluxDB and Grafana, and connecting them.
 type: application
-version: 0.1.0
+version: 0.0.0
 dependencies:
   - name: grafana
     version: 11.3.3
