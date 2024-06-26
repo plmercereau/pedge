@@ -103,4 +103,20 @@ jobs:
         run: |
           echo "test"
           echo ${{ matrix.helmContext }}
-          helm
+      # # TODO helm repo add / search not supported: https://github.com/apollographql/router/issues/1643
+      # # TODO fall back to curl...
+      # - name: Connect helm to the ghcr.io registry
+      #   run: |
+      #     helm registry login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+      # - name: add the OCI ghcr.io repository plmercereau/pedge
+      #   run: |
+      #     helm repo add plmercereau oci://ghcr.io/plmercereau/pedge
+      #     helm repo update
+      # - name: get latest helm version and put it into an output so it can be used in the next step
+      #   id: get_latest_version
+      #   run: |
+      #     VERSION=$(helm search repo -r "\vbitnami/nginx\v" -o json | jq -r '.[0].version')
+      #     echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      # - name: Echo the latest helm version from previous step
+      #   run: |
+      #     echo ${{ steps.get_latest_version.outputs.latest_version }}
