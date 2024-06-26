@@ -122,11 +122,8 @@ jobs:
           yq e '.appVersion = "${{ matrix.version }}"' -i ${{ matrix.helmContext }}/Chart.yaml
           # TODO commit the changes
           cat ${{ matrix.helmContext }}/Chart.yaml
-      - name: package the helm chart
-        if: steps.get_latest_version.outputs.latest_version != matrix.version
-        run: |
-          helm package ${{ matrix.helmContext }}
       - name: push the helm chart to the ghcr.io registry
         if: steps.get_latest_version.outputs.latest_version != matrix.version
         run: |
+          helm package ${{ matrix.helmContext }}
           helm push ${{ matrix.name }}-chart-${{ matrix.version }}.tgz oci://ghcr.io/plmercereau
