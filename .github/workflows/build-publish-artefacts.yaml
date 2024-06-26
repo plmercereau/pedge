@@ -32,7 +32,7 @@ jobs:
   build-and-push-images:
     needs: generate-matrix
     runs-on: ubuntu-latest
-    name: "Image: ${{ matrix.name }}"
+    name: "Image: ${{ env.REPO }}/${{ matrix.name }}"
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.images) }}
@@ -91,7 +91,7 @@ jobs:
       # TODO add the dependency again
       # - build-and-push-images
     runs-on: ubuntu-latest
-    name: "Chart: ${{ matrix.name }}"
+    name: "Chart: ${{ env.REPO_CHARTS }}/${{ matrix.name }}"
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.charts) }}
