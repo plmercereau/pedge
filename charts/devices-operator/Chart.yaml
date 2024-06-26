@@ -3,4 +3,23 @@ name: devices-operator
 description: A Helm chart for installing the devices operator.
 type: application
 version: 0.0.0
-dependencies: []
+appVersion: 0.0.0
+dependencies:
+  - name: traefik
+    version: 28.2.0
+    repository: https://traefik.github.io/charts
+    condition: traefik.enabled
+  - name: cert-manager
+    version: 1.2.1
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: cert-manager.enabled
+  - name: rabbitmq-cluster-operator
+    alias: rabbitmq-operator
+    version: 4.2.10
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: rabbitmq-operator.enabled
+  - name: operator
+    alias: minio-operator
+    version: 5.0.15
+    repository: https://operator.min.io
+    condition: minio-operator.enabled

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "devices-operator.fullname" . }}
+  labels:
+    app: {{ include "devices-operator.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "devices-operator.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "devices-operator.fullname" . }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | default (include "devices-operator.fullname" .) }}
+      containers:
+        - name: devices-operator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}

@@ -1,0 +1,36 @@
+replicaCount: 1
+
+image:
+  repository: oci://ghcr.io/plmercereau/pedge/devices-operator
+  # Use the chart appVersion as the default tag
+  # tag: latest
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+fullNameOverride: ""
+
+traefik:
+  enabled: false
+  fullnameOverride: traefik
+
+cert-manager:
+  enabled: false
+  fullnameOverride: cert-manager
+  installCRDs: true
+
+rabbitmq-operator:
+  enabled: false
+  fullnameOverride: rabbitmq-cluster-operator
+  useCertManager: true
+
+minio-operator:
+  enabled: false
+  fullnameOverride: minio-operator

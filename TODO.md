@@ -1,6 +1,5 @@
-- publish the influx/grafana helm chart
-- develop and publish an operator helm chart
-
+- rename "firmware" to "device installation"
+  - and create a new "firmware" resource that can also be built, but not linked to a specific device (firmware without the specifics of a device)
 - develop a rancher UI interface
 
   - CRUD devices

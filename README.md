@@ -1,19 +1,47 @@
 # pedge
 
-## PXE
+## Installation
 
-### Server
+### Install InfluxDB and Grafana
 
-use pixiecore
+```sh
+export DEVICE_CLUSTER_NAME=devices-cluster
+helm install influxdb-grafana oci://ghcr.io/plmercereau/pedge-charts/influxdb-grafana \
+    --set=grafana.ingress.enabled=true \
+    --set=grafana.ingress.ingressClassName=traefik
+```
 
-### Client
+### Install the Devices operator
 
-Test with VirtualBox
+```sh
+helm install devices-operator oci://ghcr.io/plmercereau/pedge-charts/devices-operator \
+    --set=traefik.enabled=true \
+    --set=cert-manager.enabled=true \
+    --set=rabbitmq-operator.enabled=true \
+    --set=minio-operator.enabled=true
+```
 
-### Misc
+### Add a Devices cluster
 
-#### multi-arch docker build
+```sh
+kubectl apply -f - <<EOF
+apiVersion: devices.pedge.io/v1alpha1
+kind: DeviceCluster
+metadata:
+  name: devices-cluster
+spec:
+  mqtt:
+    sensorsTopic: sensors
+  influxdb:
+    name: influxdb
+    namespace: default
+    secretReference:
+      name: influxdb-auth
+EOF
+```
 
-https://github.com/collinarnett/docker-utils
+## Development
 
-https://carjorvaz.com/posts/ipxe-booting-with-nixos/
+```sh
+tilt up
+```
