@@ -103,8 +103,20 @@ jobs:
         run: |
           echo "test"
           echo ${{ matrix.helmContext }}
-      # # TODO helm repo add / search not supported: https://github.com/apollographql/router/issues/1643
-      # # TODO fall back to curl...
+      - name: replace the version in the helm chart
+        run: |
+          yq e '.version = "${{ matrix.version }}"' -i ${{ matrix.helmContext }}/Chart.yaml
+          yq e '.appVersion = "${{ matrix.version }}"' -i ${{ matrix.helmContext }}/Chart.yaml
+          # TODO commit the changes
+          cat ${{ matrix.helmContext }}/Chart.yaml
+      - name: get the latest version
+        id: get_latest_version
+        run: |
+          API_URL=https://api.github.com/users/plmercereau/packages/container/devices-operator/versions
+          VERSIONS=$(curl -s -L -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $API_URL)
+          VERSION=$(echo $VERSIONS | jq -j '.[] | select(.metadata.container.tags | index("latest")) | .metadata.container.tags | map(select(. != "latest")) | .[0]')
+          echo $VERSION
+          echo "last_version=$VERSION" >> "$GITHUB_OUTPUT"
       # - name: Connect helm to the ghcr.io registry
       #   run: |
       #     helm registry login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
