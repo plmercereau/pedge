@@ -1,0 +1,8 @@
+rabbitmq-operator:
+  enabled: false
+  fullnameOverride: rabbitmq-cluster-operator
+  useCertManager: true
+
+minio-operator:
+  enabled: false
+  fullnameOverride: minio-operator

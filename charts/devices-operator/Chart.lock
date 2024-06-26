@@ -6,4 +6,4 @@ dependencies:
   repository: https://operator.min.io
   version: 5.0.15
 digest: sha256:f56b388669cf9fade6ef21eb287d062b0944d5526d8783ebb3130468a7f1e549
-generated: "2024-06-26T16:13:34.634674+02:00"
+generated: "2024-06-26T17:53:28.751242+02:00"

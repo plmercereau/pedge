@@ -68,6 +68,21 @@
                       '';
                     }
                   )
+                  (
+                    # TODO not working for other architectures...
+                    pkgs.stdenv.mkDerivation {
+                      name = "helmify";
+                      src = pkgs.fetchurl {
+                        url = "https://github.com/arttor/helmify/releases/download/v0.4.13/helmify_Darwin_arm64.tar.gz";
+                        sha256 = "sha256-t4pddkkHCgjyRnhu7xNgkQTB16eaDRsUdUrdSYx2MQo=";
+                      };
+                      phases = ["installPhase" "patchPhase"];
+                      installPhase = ''
+                        mkdir -p $out/bin
+                        tar xvzf $src -C $out/bin
+                      '';
+                    }
+                  )
                 ];
               }
             ];
