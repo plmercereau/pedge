@@ -43,8 +43,7 @@
                   enable = true;
                   name = "Generate the Device Operator Helm chart";
                   entry = "cd devices-operator && make helm";
-                  files = "^devices-operator/";
-                  types = ["go" "yaml"];
+                  files = "^devices-operator/.*\\.(go|yaml)$";
                 };
                 packages = with pkgs; [
                   # go_1_21 # * See https://github.com/operator-framework/operator-sdk/issues/6681
