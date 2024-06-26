@@ -87,7 +87,7 @@ jobs:
       # TODO add the dependency again
       # - build-and-push-images
     runs-on: ubuntu-latest
-    name: "Chart: ${{ matrix.name }}"
+    name: "Chart: ${{ matrix.name }}-chart"
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.charts) }}
@@ -103,32 +103,30 @@ jobs:
         run: |
           echo "test"
           echo ${{ matrix.helmContext }}
+      - name: get the latest version
+        id: get_latest_version
+        run: |
+          API_URL=https://api.github.com/users/plmercereau/packages/container/${{ matrix.name }}-chart/versions
+          VERSIONS=$(curl -s -L -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $API_URL)
+          VERSION=$(echo $VERSIONS | jq -j 'try .[] | select(.metadata.container.tags | index("${{ matrix.version }}")) | .metadata.container.tags | .[0] // ""')
+          echo $VERSION
+          echo "latest_version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Connect helm to the ghcr.io registry
+        if: steps.get_latest_version.outputs.latest_version != matrix.version
+        run: |
+          helm registry login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - name: replace the version in the helm chart
+        if: steps.get_latest_version.outputs.latest_version != matrix.version
         run: |
           yq e '.version = "${{ matrix.version }}"' -i ${{ matrix.helmContext }}/Chart.yaml
           yq e '.appVersion = "${{ matrix.version }}"' -i ${{ matrix.helmContext }}/Chart.yaml
           # TODO commit the changes
           cat ${{ matrix.helmContext }}/Chart.yaml
-      - name: get the latest version
-        id: get_latest_version
+      - name: package the helm chart
+        if: steps.get_latest_version.outputs.latest_version != matrix.version
         run: |
-          API_URL=https://api.github.com/users/plmercereau/packages/container/devices-operator/versions
-          VERSIONS=$(curl -s -L -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $API_URL)
-          VERSION=$(echo $VERSIONS | jq -j '.[] | select(.metadata.container.tags | index("latest")) | .metadata.container.tags | map(select(. != "latest")) | .[0]')
-          echo $VERSION
-          echo "last_version=$VERSION" >> "$GITHUB_OUTPUT"
-      # - name: Connect helm to the ghcr.io registry
-      #   run: |
-      #     helm registry login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-      # - name: add the OCI ghcr.io repository plmercereau/pedge
-      #   run: |
-      #     helm repo add plmercereau oci://ghcr.io/plmercereau/pedge
-      #     helm repo update
-      # - name: get latest helm version and put it into an output so it can be used in the next step
-      #   id: get_latest_version
-      #   run: |
-      #     VERSION=$(helm search repo -r "\vbitnami/nginx\v" -o json | jq -r '.[0].version')
-      #     echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-      # - name: Echo the latest helm version from previous step
-      #   run: |
-      #     echo ${{ steps.get_latest_version.outputs.latest_version }}
+          helm package ${{ matrix.helmContext }}
+      - name: push the helm chart to the ghcr.io registry
+        if: steps.get_latest_version.outputs.latest_version != matrix.version
+        run: |
+          helm push ${{ matrix.name }}-chart-${{ matrix.version }}.tgz oci://ghcr.io/plmercereau
