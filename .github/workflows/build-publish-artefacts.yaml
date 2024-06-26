@@ -88,8 +88,7 @@ jobs:
   publish-charts:
     needs:
       - generate-matrix
-      # TODO add the dependency again
-      # - build-and-push-images
+      - build-and-push-images
     runs-on: ubuntu-latest
     name: "Chart: ${{ matrix.name }}"
     strategy:
