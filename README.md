@@ -2,6 +2,17 @@
 
 ## Installation
 
+### Prerequisites
+
+```sh
+helm repo add traefik https://traefik.github.io/charts
+helm install traefik traefik/traefik --version=28.2.0 --create-namespace
+
+helm install cert-manager oci://registry-1.docker.io/bitnamicharts/cert-manager \
+    --version=1.2.1 \
+    --set=installCRDs=true
+```
+
 ### Install InfluxDB and Grafana
 
 ```sh
@@ -15,8 +26,6 @@ helm install influxdb-grafana oci://ghcr.io/plmercereau/pedge-charts/influxdb-gr
 
 ```sh
 helm install devices-operator oci://ghcr.io/plmercereau/pedge-charts/devices-operator \
-    --set=traefik.enabled=true \
-    --set=cert-manager.enabled=true \
     --set=rabbitmq-operator.enabled=true \
     --set=minio-operator.enabled=true
 ```

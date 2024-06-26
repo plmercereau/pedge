@@ -1,15 +1,9 @@
 dependencies:
-- name: traefik
-  repository: https://traefik.github.io/charts
-  version: 28.2.0
-- name: cert-manager
-  repository: oci://registry-1.docker.io/bitnamicharts
-  version: 1.2.1
 - name: rabbitmq-cluster-operator
   repository: oci://registry-1.docker.io/bitnamicharts
   version: 4.2.10
 - name: operator
   repository: https://operator.min.io
   version: 5.0.15
-digest: sha256:8572a1bf13db61ee02312516096b22fe0570d92eebc7debec89edcb29eb36548
-generated: "2024-06-26T14:52:46.540168+02:00"
+digest: sha256:f56b388669cf9fade6ef21eb287d062b0944d5526d8783ebb3130468a7f1e549
+generated: "2024-06-26T16:13:34.634674+02:00"
