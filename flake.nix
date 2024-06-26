@@ -43,7 +43,8 @@
                   enable = true;
                   name = "Generate the Device Operator Helm chart";
                   entry = "cd devices-operator && make helm";
-                  files = "^devices-operator/.*\\.(go|yaml)$";
+                  files = "^devices-operator/";
+                  types = ["go" "yaml"];
                   pass_filenames = false;
                   verbose = true;
                 };
