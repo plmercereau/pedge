@@ -1,0 +1,6 @@
+apiVersion: v2
+name: devices-operator
+description: A Helm chart for installing the devices operator.
+type: application
+version: 0.1.0
+dependencies: []
