@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+env:
+  ORG: plmercereau
+  REPO: pedge
+  REPO_CHARTS: pedge-charts
 
 jobs:
   generate-matrix:
@@ -67,10 +71,10 @@ jobs:
           context: ${{ matrix.dockerContext }}
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ matrix.version }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:latest
-            plmercereau/${{ matrix.name }}:${{ matrix.version }}
-            plmercereau/${{ matrix.name }}:latest
+            ghcr.io/${{ env.ORG }}/${{ env.REPO }}/${{ matrix.name }}:${{ matrix.version }}
+            ghcr.io/${{ env.ORG }}/${{ env.REPO }}/${{ matrix.name }}:latest
+            ${{ env.ORG }}/${{ matrix.name }}:${{ matrix.version }}
+            ${{ env.ORG }}/${{ matrix.name }}:latest
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -106,27 +110,19 @@ jobs:
       - name: get chart information
         id: info
         run: |
-          NAME=$(yq -r '.name' ${{ matrix.helmContext }}/Chart.yaml)
-          API_URL=https://api.github.com/users/plmercereau/packages/container/$NAME/versions
+          API_URL=https://api.github.com/users/${{ env.ORG }}/packages/container/${{ env.REPO_CHARTS }}%2F${{ matrix.name }}/versions
           VERSIONS=$(curl -s -L -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $API_URL)
           VERSION=$(echo $VERSIONS | jq -j 'try .[] | select(.metadata.container.tags | index("${{ matrix.version }}")) | .metadata.container.tags | .[0] // ""')
-          echo $VERSION
           echo "latest_version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
       - name: Connect helm to the ghcr.io registry
         if: steps.info.outputs.latest_version != matrix.version
         run: |
           helm registry login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-      # # ? commit new versions to the repository ?
-      # - name: replace the version in the helm chart
-      #   if: steps.info.outputs.latest_version != matrix.version
-      #   run: |
-      #     yq e '.version = "${{ matrix.version }}"' -i ${{ matrix.helmContext }}/Chart.yaml
-      #     yq e '.appVersion = "${{ matrix.version }}"' -i ${{ matrix.helmContext }}/Chart.yaml
-      #     cat ${{ matrix.helmContext }}/Chart.yaml
       - name: package the helm chart
         if: steps.info.outputs.latest_version != matrix.version
         run: |
+          # make sure we get the name right
+          yq e '.name = "${{ matrix.name }}"' -i ${{ matrix.helmContext }}/Chart.yaml
           # If there is a docker context, set app-version to the same version
           if [ -n "${{ matrix.dockerContext }}" ]; then
             helm package --version ${{ matrix.version }} --app-version ${{ matrix.version }} ${{ matrix.helmContext }}
@@ -136,4 +132,4 @@ jobs:
       - name: push the helm chart to the ghcr.io registry
         if: steps.info.outputs.latest_version != matrix.version
         run: |
-          helm push ${{ steps.info.outputs.name }}-${{ matrix.version }}.tgz oci://ghcr.io/plmercereau
+          helm push ${{ matrix.name }}-${{ matrix.version }}.tgz oci://ghcr.io/${{ env.ORG }}/${{ env.REPO_CHARTS }}
