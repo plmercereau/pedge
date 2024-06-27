@@ -1,6 +1,6 @@
 ## Append samples of your project ##
 resources:
   - devices_v1alpha1_device.yaml
-  - devices_v1alpha1_devicecluster.yaml
+  - devices_v1alpha1_devicescluster.yaml
   - devices_v1alpha1_firmware.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

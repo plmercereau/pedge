@@ -4,7 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type DeviceClusterReference struct {
+type DevicesClusterReference struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name,omitempty"`
 }
@@ -17,7 +17,7 @@ type FirmwareReference struct {
 // DeviceSpec defines the desired state of Device
 type DeviceSpec struct {
 	// +kubebuilder:validation:Required
-	DeviceClusterReference DeviceClusterReference `json:"deviceClusterReference"`
+	DevicesClusterReference DevicesClusterReference `json:"devicesClusterReference"`
 	// +kubebuilder:validation:Optional
 	FirmwareReference FirmwareReference `json:"firmwareReference,omitempty"`
 }

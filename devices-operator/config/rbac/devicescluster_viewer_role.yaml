@@ -1,20 +1,20 @@
-# permissions for end users to view deviceclusters.
+# permissions for end users to view devicesclusters.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: devicecluster-viewer-role
+    app.kubernetes.io/instance: devicescluster-viewer-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: pedge-devices-operator
     app.kubernetes.io/part-of: pedge-devices-operator
     app.kubernetes.io/managed-by: kustomize
-  name: devicecluster-viewer-role
+  name: devicescluster-viewer-role
 rules:
   - apiGroups:
       - devices.pedge.io
     resources:
-      - deviceclusters
+      - devicesclusters
     verbs:
       - get
       - list
@@ -22,6 +22,6 @@ rules:
   - apiGroups:
       - devices.pedge.io
     resources:
-      - deviceclusters/status
+      - devicesclusters/status
     verbs:
       - get

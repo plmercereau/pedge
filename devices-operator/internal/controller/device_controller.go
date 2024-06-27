@@ -73,14 +73,14 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	deviceCluster := &pedgev1alpha1.DeviceCluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClusterReference.Name, Namespace: device.Namespace}, deviceCluster); err != nil {
-		logger.Error(err, "unable to fetch DeviceCluster")
+	devicesCluster := &pedgev1alpha1.DevicesCluster{}
+	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
+		logger.Error(err, "unable to fetch DevicesCluster")
 		return ctrl.Result{}, err
 	}
 
 	// Sync resources
-	if err := r.syncResources(ctx, device, firmware, deviceCluster); err != nil {
+	if err := r.syncResources(ctx, device, firmware, devicesCluster); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -88,7 +88,7 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // syncResources creates or updates the associated resources
-func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alpha1.Device, firmware *pedgev1alpha1.Firmware, deviceCluster *pedgev1alpha1.DeviceCluster) error {
+func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alpha1.Device, firmware *pedgev1alpha1.Firmware, devicesCluster *pedgev1alpha1.DevicesCluster) error {
 	logger := log.FromContext(ctx)
 
 	// Secret
@@ -166,7 +166,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 		},
 		Spec: rabbitmqtopologyv1.UserSpec{
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name: deviceCluster.Name,
+				Name: devicesCluster.Name,
 			},
 			ImportCredentialsSecret: &corev1.LocalObjectReference{
 				Name: secretName,
@@ -194,8 +194,8 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 				Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      deviceCluster.Name,
-				Namespace: deviceCluster.Namespace,
+				Name:      devicesCluster.Name,
+				Namespace: devicesCluster.Namespace,
 			},
 		},
 	}
@@ -216,13 +216,13 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 			},
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
-				Write:    fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic, device.Name),
+				Write:    fmt.Sprintf("^%s\\.%s\\..+$", devicesCluster.Spec.MQTT.SensorsTopic, device.Name),
 				// TODO narrow down the read permissions: the device should only be able to write to its own topic
-				Read: fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic, device.Name),
+				Read: fmt.Sprintf("^%s\\.%s\\..+$", devicesCluster.Spec.MQTT.SensorsTopic, device.Name),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      deviceCluster.Name,
-				Namespace: deviceCluster.Namespace,
+				Name:      devicesCluster.Name,
+				Namespace: devicesCluster.Namespace,
 			},
 		},
 	}
@@ -243,13 +243,13 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 		if err != nil && errors.IsNotFound(err) {
 			logger.Info("Creating new firmware build job " + jobName)
 			service := &corev1.Service{}
-			err := r.Get(ctx, types.NamespacedName{Name: deviceCluster.Name, Namespace: deviceCluster.Namespace}, service)
+			err := r.Get(ctx, types.NamespacedName{Name: devicesCluster.Name, Namespace: devicesCluster.Namespace}, service)
 			if err != nil {
 				logger.Error(err, "unable to fetch service")
 				return err
 			}
 			// TODO check if the service is a LoadBalancer and has an IP. Warn if more than one IP
-			// TODO use possible custom broker/port values in the DeviceCluster spec
+			// TODO use possible custom broker/port values in the DevicesCluster spec
 			serviceIngress := service.Status.LoadBalancer.Ingress[0]
 			var mqttBroker string
 			if serviceIngress.Hostname != "" {
@@ -342,7 +342,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 									Env: []corev1.EnvVar{
 										{
 											Name:  "AWS_ENDPOINT_URL_S3",
-											Value: fmt.Sprintf("https://minio.%s.svc.cluster.local", deviceCluster.Namespace),
+											Value: fmt.Sprintf("https://minio.%s.svc.cluster.local", devicesCluster.Namespace),
 										},
 										{
 											Name:  "AWS_DEFAULT_REGION",
@@ -353,7 +353,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 											ValueFrom: &corev1.EnvVarSource{
 												SecretKeyRef: &corev1.SecretKeySelector{
 													LocalObjectReference: corev1.LocalObjectReference{
-														Name: deviceCluster.Name + deviceClusterSecretSuffix,
+														Name: devicesCluster.Name + devicesClusterSecretSuffix,
 													},
 													Key: s3AccessKeyId,
 												},
@@ -364,7 +364,7 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 											ValueFrom: &corev1.EnvVarSource{
 												SecretKeyRef: &corev1.SecretKeySelector{
 													LocalObjectReference: corev1.LocalObjectReference{
-														Name: deviceCluster.Name + deviceClusterSecretSuffix,
+														Name: devicesCluster.Name + devicesClusterSecretSuffix,
 													},
 													Key: s3SecretAccessKey,
 												},
@@ -440,7 +440,7 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.Device{}).
-		// TODO Watch DeviceCluster, too (the sensors topic name can change)
+		// TODO Watch DevicesCluster, too (the sensors topic name can change)
 		// Watch for changes in the secret of the device
 		Watches(
 			&corev1.Secret{},

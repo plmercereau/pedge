@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
 	//+kubebuilder:scaffold:imports
 	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	"github.com/plmercereau/pedge/internal/controller"
@@ -137,11 +138,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Device")
 		os.Exit(1)
 	}
-	if err = (&controller.DeviceClusterReconciler{
+	if err = (&controller.DevicesClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DeviceCluster")
+		setupLog.Error(err, "unable to create controller", "controller", "DevicesCluster")
 		os.Exit(1)
 	}
 	if err = (&controller.FirmwareReconciler{

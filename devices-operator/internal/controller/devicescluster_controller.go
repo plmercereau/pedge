@@ -26,43 +26,43 @@ import (
 )
 
 const (
-	s3AccessKeyId             = "accesskey" // ! cannot be changed - depends on the MinIO operator
-	s3SecretAccessKey         = "secretkey" // ! cannot be changed - depends on the MinIO operator
-	deviceClusterSecretSuffix = "-device-cluster"
-	bucketName                = "firmwares"
-	bucketRegion              = "default"
-	listenerUserName          = "device-listener"
+	s3AccessKeyId              = "accesskey" // ! cannot be changed - depends on the MinIO operator
+	s3SecretAccessKey          = "secretkey" // ! cannot be changed - depends on the MinIO operator
+	devicesClusterSecretSuffix = "-device-cluster"
+	bucketName                 = "firmwares"
+	bucketRegion               = "default"
+	listenerUserName           = "device-listener"
 )
 
-// DeviceClusterReconciler reconciles a DeviceCluster object
-type DeviceClusterReconciler struct {
+// DevicesClusterReconciler reconciles a DevicesCluster object
+type DevicesClusterReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=devices.pedge.io,resources=devicesclusters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=devices.pedge.io,resources=devicesclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rabbitmq.com,resources=rabbitmqclusters;vhosts;queues;permissions;topicpermissions;users,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=minio.min.io,resources=tenants,verbs=get;list;watch;create;update;patch;delete
 
-func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DevicesClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// Fetch the DeviceCluster instance
-	server := &pedgev1alpha1.DeviceCluster{}
+	// Fetch the DevicesCluster instance
+	server := &pedgev1alpha1.DevicesCluster{}
 	err := r.Get(ctx, req.NamespacedName, server)
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "unable to fetch DeviceCluster")
+		logger.Error(err, "unable to fetch DevicesCluster")
 		return ctrl.Result{}, err
 	}
 
 	// Secret
-	secretName := server.Name + deviceClusterSecretSuffix
+	secretName := server.Name + devicesClusterSecretSuffix
 	// TODO decidated minio user
 	// * see https://github.com/minio/operator/blob/master/examples/kustomization/base/storage-user.yaml
 	// * and https://github.com/minio/operator/blob/fd7ede7ba9b5e0c4730284afff84c1350933f848/examples/kustomization/base/tenant.yaml#L33
@@ -82,7 +82,7 @@ func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				"config.env":      []byte(fmt.Sprintf("export MINIO_ROOT_USER=%s\nexport MINIO_ROOT_PASSWORD=%s", accessKey, secretKey)),
 			},
 		}
-		// Set the ownerRef for the secret to ensure it gets cleaned up when the device cluster is deleted
+		// Set the ownerRef for the secret to ensure it gets cleaned up when the devices cluster is deleted
 		// if err := ctrl.SetControllerReference(server, secret, r.Scheme); err != nil {
 		// 	return ctrl.Result{}, err
 		// }
@@ -132,7 +132,7 @@ func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 }
 
 // syncResources creates or updates the associated resources
-func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *pedgev1alpha1.DeviceCluster) error {
+func (r *DevicesClusterReconciler) syncResources(ctx context.Context, server *pedgev1alpha1.DevicesCluster) error {
 	// Define the desired RabbitMQ Cluster resource
 	cluster := &rabbitmqv1.RabbitmqCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -171,7 +171,7 @@ log.console.level = debug
 	}
 	controllerutil.SetOwnerReference(server, vhost, r.Scheme)
 	// We only create the vhost if it doesn't exist. The RabbitMQ messaging topology operator does not allow to modify it.
-	// TODO we should also block some updates on the device cluster name - through a validation webhook
+	// TODO we should also block some updates on the devices cluster name - through a validation webhook
 	existingVhost := vhost.DeepCopyObject().(client.Object)
 	if err := r.Get(ctx, client.ObjectKeyFromObject(vhost), existingVhost); err != nil && errors.IsNotFound(err) {
 		return r.Create(ctx, vhost)
@@ -295,7 +295,7 @@ log.console.level = debug
 		},
 	}
 	// TODO it seems rabbitmq is already watching/owning the user, and when set to server, the permissions are not applied
-	// For now, accept users are not deleted with the device cluster...
+	// For now, accept users are not deleted with the devices cluster...
 	// controllerutil.SetOwnerReference(server, listenerUser, r.Scheme)
 
 	// Define the desired RabbitMQ Permission resource
@@ -354,7 +354,7 @@ log.console.level = debug
 			Namespace: server.Namespace,
 			// the minio controller is not behaving well when using controllerutil.SetOwnerReference
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
+				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DevicesCluster")),
 			},
 		},
 		Spec: miniov2.TenantSpec{
@@ -387,7 +387,7 @@ log.console.level = debug
 			},
 			// CredsSecret is not working anymore: https://github.com/minio/operator/blob/master/pkg/apis/minio.min.io/v2/types.go#L356C2-L356C15
 			Configuration: &corev1.LocalObjectReference{
-				Name: server.Name + deviceClusterSecretSuffix,
+				Name: server.Name + devicesClusterSecretSuffix,
 			},
 			RequestAutoCert: &requestAutoCert,
 		},
@@ -403,7 +403,7 @@ log.console.level = debug
 }
 
 // creates or updates a resource
-func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
+func (r *DevicesClusterReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
 	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 	existing := obj.DeepCopyObject().(client.Object)
 	err := r.Get(ctx, key, existing)
@@ -433,9 +433,9 @@ func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client
 }
 
 // SetupWithManager sets up the controller with the Manager
-func (r *DeviceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DevicesClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&pedgev1alpha1.DeviceCluster{}).
+		For(&pedgev1alpha1.DevicesCluster{}).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForInfluxSecret),
@@ -444,7 +444,7 @@ func (r *DeviceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *DeviceClusterReconciler) findObjectsForInfluxSecret(ctx context.Context, secret client.Object) []reconcile.Request {
+func (r *DevicesClusterReconciler) findObjectsForInfluxSecret(ctx context.Context, secret client.Object) []reconcile.Request {
 	attachedDevices := &pedgev1alpha1.FirmwareList{}
 	listOps := &client.ListOptions{
 		FieldSelector: fields.AndSelectors(
