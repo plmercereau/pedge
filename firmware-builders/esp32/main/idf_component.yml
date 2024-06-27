@@ -1,0 +1,6 @@
+# https://components.espressif.com/
+dependencies:
+  espressif/arduino-esp32:
+    pre_release: false
+    version: "3.0.0-rc1" # Later versions are not working - see https://github.com/espressif/arduino-esp32/issues/9644
+
