@@ -5,6 +5,9 @@
     flake-utils.url = "github:numtide/flake-utils";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs-devenv";
+    esp-idf.url = "github:mirrexagon/nixpkgs-esp-dev";
+    esp-idf.inputs.nixpkgs.follows = "nixpkgs-devenv";
+    esp-idf.inputs.flake-utils.follows = "flake-utils";
   };
 
   nixConfig = {
@@ -18,6 +21,7 @@
     nixpkgs-devenv,
     devenv,
     flake-utils,
+    esp-idf,
     ...
   } @ inputs:
     flake-utils.lib.eachDefaultSystem (system: let
@@ -54,12 +58,13 @@
                   mqttui # MQTT client, for testing purpose
                   platformio-core
                   ngrok
-                  # operator-sdk # package not working
                   kustomize
                   yq-go
                   act
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
+                  esp-idf.packages.${system}.esp-idf-full
                   (
+                    # operator-sdk package not working
                     # TODO not working for other architectures...
                     pkgs.stdenv.mkDerivation {
                       name = "operator-sdk";
