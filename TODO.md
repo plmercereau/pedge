@@ -12,8 +12,11 @@
     - device-related config stored in `device.data` key-values
       - automatically add MQTT credentials e.g. username/password, broker, port, topic name(s)
       - custom mapping, same system as for DeviceClass
+      - create a job that generates the `secret.<device name>.data.file`
+        - each DeviceClass would have a `spec.config.builder` docker image
+        - avoid an infinite loop: https://chatgpt.com/share/618cc21b-1c80-41c3-b242-e65b0e96e6bd
   - DeviceClass spec
-    - spec.firmware.builder (same as firmware.spec.builder)
+    - `spec.firmware.builder` (same as firmware.spec.builder)
     - specific device class-wide secrets - how, maybe a list of secret keys in the specs e.g.
       - `deviceClass.<name>.secrets.keys = ["PROVISIONNER_WIFI_SSID"]`
       - `secret.<name>-device-class.stringData.PROVISIONNER_WIFI_SSID = "abcd"`

@@ -51,8 +51,8 @@
                   pass_filenames = false;
                 };
                 packages = with pkgs; [
-                  # go_1_21 # * See https://github.com/operator-framework/operator-sdk/issues/6681
-                  go
+                  go_1_21 # * See https://github.com/operator-framework/operator-sdk/issues/6681
+                  # go
                   kubectl
                   tilt
                   mqttui # MQTT client, for testing purpose
@@ -62,7 +62,7 @@
                   yq-go
                   act
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
-                  esp-idf.packages.${system}.esp-idf-full
+                  # esp-idf.packages.${system}.esp-idf-full
                   (
                     # operator-sdk package not working
                     # TODO not working for other architectures...

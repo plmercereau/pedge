@@ -27,6 +27,12 @@ dependencies:
       service_url: https://api.components.espressif.com/
       type: service
     version: 1.4.12
+  espressif/esp-idf-cxx:
+    component_hash: 2fa63e4e725f0c2d3dd6d99da8a91d404b4b49667088b1be0f336eb9c13ff17f
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 1.0.2-beta
   espressif/esp-sr:
     component_hash: 16af25295f531495fe7e36cf2e8c8bb49629be42c38a56f55f4ded825ada0ffc
     source:
@@ -69,6 +75,12 @@ dependencies:
       service_url: https://api.components.espressif.com/
       type: service
     version: 1.1.0
+  espressif/esp_mqtt_cxx:
+    component_hash: 08c9cfd2aa1eb9b3f8064e0d7ba9c8a341dd86caa8f9ae7fc5b882e5b473c79f
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 0.3.0
   espressif/esp_rainmaker:
     component_hash: 25008c033cd20c99eedf86b42e12d35723f59a02cc577b7d5fc3b683864a72ff
     source:
@@ -144,6 +156,6 @@ dependencies:
       service_url: https://api.components.espressif.com/
       type: service
     version: 1.14.6
-manifest_hash: 886004bad55c8c2790eed77668852dfbf924e5357c1533e99a6d7b8ef39c80a7
+manifest_hash: 3866c89fc0d89c45c879d2b71d4bdfa9637d271b7e116b9024f1b2ce62bc1007
 target: esp32
 version: 1.0.0
