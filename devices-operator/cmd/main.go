@@ -1,79 +1,71 @@
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package main
 
 import (
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"os"
-	"runtime"
-	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
-	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
-	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
+	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	ctrlruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	//+kubebuilder:scaffold:imports
-	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
+	devicesv1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	"github.com/plmercereau/pedge/internal/controller"
-
 	//+kubebuilder:scaffold:imports
-	miniov2 "github.com/minio/operator/pkg/apis/minio.min.io/v2"
-	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
-	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
 )
 
 var (
-	scheme                         = ctrlruntime.NewScheme()
-	setupLog                       = ctrl.Log.WithName("setup")
-	defaultMaxConcurrentReconciles = runtime.NumCPU()
-	defaultReconcilePeriod         = time.Minute
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(pedgev1alpha1.AddToScheme(scheme))
-	utilruntime.Must(rabbitmqtopologyv1.AddToScheme(scheme))
-	utilruntime.Must(rabbitmqv1.AddToScheme(scheme))
-	utilruntime.Must(miniov2.AddToScheme(scheme))
+	utilruntime.Must(devicesv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	var (
-		metricsAddr          string
-		leaderElectionID     string
-		watchesPath          string
-		probeAddr            string
-		enableLeaderElection bool
-		enableHTTP2          bool
-		secureMetrics        bool
-	)
+	var metricsAddr string
+	var enableLeaderElection bool
+	var probeAddr string
+	var secureMetrics bool
+	var enableHTTP2 bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.StringVar(&watchesPath, "watches-file", "watches.yaml", "path to watches file")
-	flag.StringVar(&leaderElectionID, "leader-election-id", "86f835c3.pedge.io", "provide leader election")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", false,
-		"Whether or not the metrics endpoint should be served securely")
+		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
-		"Whether or not HTTP/2 should be enabled for the metrics and webhook servers")
+		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -102,19 +94,7 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
-	cfg := ctrl.GetConfigOrDie()
-
-	if err := checkCRDExists(cfg, "users.rabbitmq.com", "rabbitmq.com", "v1beta1"); err != nil {
-		setupLog.Error(err, "Could not find CRDs of the RabbitMQ Topology Operator. Please install the operator before running this operator.")
-		os.Exit(1)
-	}
-	if err := checkCRDExists(cfg, "rabbitmqclusters.rabbitmq.com", "rabbitmq.com", "v1beta1"); err != nil {
-		setupLog.Error(err, "Could not find CRDs of the RabbitMQ Operator. Please install the operator before running this operator.")
-		os.Exit(1)
-	}
-	// TODO check CRDs: minio, cert-manager, etc
-
-	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress:   metricsAddr,
@@ -124,7 +104,18 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       leaderElectionID,
+		LeaderElectionID:       "86f835c3.pedge.io",
+		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
+		// when the Manager ends. This requires the binary to immediately end when the
+		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
+		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// LeaseDuration time first.
+		//
+		// In the default scaffold provided, the program ends immediately after
+		// the manager stops, so would be fine to enable this option. However,
+		// if you are doing or is intended to do any operation such as perform cleanups
+		// after the manager stops then its usage might be unsafe.
+		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -138,6 +129,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Device")
 		os.Exit(1)
 	}
+
 	if err = (&controller.DevicesClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -145,6 +137,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "DevicesCluster")
 		os.Exit(1)
 	}
+
 	if err = (&controller.FirmwareReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -163,67 +156,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// * Helm reconciliers
-	ws, err := watches.Load(watchesPath)
-	if err != nil {
-		setupLog.Error(err, "Failed to create new manager factories")
-		os.Exit(1)
-	}
-	for _, w := range ws {
-		// Register controller with the factory
-		reconcilePeriod := defaultReconcilePeriod
-		if w.ReconcilePeriod != nil {
-			reconcilePeriod = w.ReconcilePeriod.Duration
-		}
-
-		maxConcurrentReconciles := defaultMaxConcurrentReconciles
-		if w.MaxConcurrentReconciles != nil {
-			maxConcurrentReconciles = *w.MaxConcurrentReconciles
-		}
-
-		r, err := reconciler.New(
-			reconciler.WithChart(*w.Chart),
-			reconciler.WithGroupVersionKind(w.GroupVersionKind),
-			reconciler.WithOverrideValues(w.OverrideValues),
-			reconciler.SkipDependentWatches(w.WatchDependentResources != nil && !*w.WatchDependentResources),
-			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
-			reconciler.WithReconcilePeriod(reconcilePeriod),
-			reconciler.WithInstallAnnotations(annotation.DefaultInstallAnnotations...),
-			reconciler.WithUpgradeAnnotations(annotation.DefaultUpgradeAnnotations...),
-			reconciler.WithUninstallAnnotations(annotation.DefaultUninstallAnnotations...),
-		)
-		if err != nil {
-			setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")
-			os.Exit(1)
-		}
-		if err := r.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Helm")
-			os.Exit(1)
-		}
-		setupLog.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartPath, "maxConcurrentReconciles", maxConcurrentReconciles, "reconcilePeriod", reconcilePeriod)
-	}
-
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-func checkCRDExists(cfg *rest.Config, crdName, crdGroup, crdVersion string) error {
-	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to create discovery client: %w", err)
-	}
-
-	return wait.PollImmediate(time.Second*5, time.Minute*1, func() (bool, error) {
-		_, err := dc.ServerResourcesForGroupVersion(fmt.Sprintf("%s/%s", crdGroup, crdVersion))
-		if err != nil {
-			if discovery.IsGroupDiscoveryFailedError(err) {
-				return false, nil // CRD is not available yet
-			}
-			return false, fmt.Errorf("failed to get server resources: %w", err)
-		}
-		return true, nil // CRD is available
-	})
 }

@@ -5,9 +5,6 @@
     flake-utils.url = "github:numtide/flake-utils";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs-devenv";
-    esp-idf.url = "github:mirrexagon/nixpkgs-esp-dev";
-    esp-idf.inputs.nixpkgs.follows = "nixpkgs-devenv";
-    esp-idf.inputs.flake-utils.follows = "flake-utils";
   };
 
   nixConfig = {
@@ -21,7 +18,6 @@
     nixpkgs-devenv,
     devenv,
     flake-utils,
-    esp-idf,
     ...
   } @ inputs:
     flake-utils.lib.eachDefaultSystem (system: let
@@ -50,27 +46,20 @@
                   files = "^devices-operator/.*\\.(go|yaml)$";
                   pass_filenames = false;
                 };
+                languages.go = {
+                  enable = true;
+                  # go_1_21 # * See https://github.com/operator-framework/operator-sdk/issues/6681
+                  package = pkgs.go;
+                };
                 packages = with pkgs; [
-                  go_1_21 # * See https://github.com/operator-framework/operator-sdk/issues/6681
-                  # go
-                  kubectl
-                  tilt
-                  mqttui # MQTT client, for testing purpose
-                  platformio-core
-                  ngrok
-                  kustomize
-                  yq-go
-                  act
-                  (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
-                  # esp-idf.packages.${system}.esp-idf-full
                   (
                     # operator-sdk package not working
                     # TODO not working for other architectures...
                     pkgs.stdenv.mkDerivation {
                       name = "operator-sdk";
                       src = pkgs.fetchurl {
-                        url = "https://github.com/operator-framework/operator-sdk/releases/download/v1.34.2/operator-sdk_darwin_arm64";
-                        sha256 = "sha256-NvMvZ80YQsNwDLq6KGxC0tEWt3GiM2Y1YJjBjxChJz0=";
+                        url = "https://github.com/operator-framework/operator-sdk/releases/download/v1.35.0/operator-sdk_darwin_arm64";
+                        sha256 = "sha256-Hhp6KZvlRqRSnWO95Ajo4CNouvgqnz/xBDcxWJMKm3A=";
                       };
                       phases = ["installPhase" "patchPhase"];
                       installPhase = ''
