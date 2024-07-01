@@ -5,8 +5,8 @@
 #include <WiFi.h>
 
 #include "Arduino.h"
-#include "settings.h"
+#include "utilities.h"
 
-void connectToWiFi();
+void setupWifi();
 
 #endif  // WIFI_HELPER_H

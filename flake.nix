@@ -52,6 +52,16 @@
                   package = pkgs.go;
                 };
                 packages = with pkgs; [
+                  kubectl
+                  tilt
+                  mqttui # MQTT client, for testing purpose
+                  platformio-core
+                  ngrok
+                  kustomize
+                  yq-go
+                  act
+                  esptool
+                  (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                   (
                     # operator-sdk package not working
                     # TODO not working for other architectures...

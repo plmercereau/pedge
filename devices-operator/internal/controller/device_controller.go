@@ -28,6 +28,7 @@ import (
 const (
 	// The suffix should not change: the rabbitmq operator takes ownership of it,
 	// and still creates a -user-credentials secret even when asked otherwise. Investigate.
+	// ! TODO The secret seems to be always created in the "default" namespace, even when the device is in another namespace!!!
 	deviceSecretSuffix      = "-user-credentials"
 	secretNameLabel         = "pedge.io/secret-name"
 	secretVersionAnnotation = "pedge.io/secret-version"
@@ -179,9 +180,10 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      device.Name,
 			Namespace: device.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
-			},
+			// ? RabbitMQ does not want to loose ownership of the resource
+			// OwnerReferences: []metav1.OwnerReference{
+			// 	*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
+			// },
 		},
 		Spec: rabbitmqtopologyv1.PermissionSpec{
 			Vhost: "/",
@@ -205,9 +207,10 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      device.Name,
 			Namespace: device.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
-			},
+			// ? RabbitMQ does not want to loose ownership of the resource
+			// OwnerReferences: []metav1.OwnerReference{
+			// 	*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
+			// },
 		},
 		Spec: rabbitmqtopologyv1.TopicPermissionSpec{
 			Vhost: "/",

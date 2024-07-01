@@ -3,7 +3,7 @@ kind: DevicesCluster
 metadata:
   labels:
     app.kubernetes.io/name: devicescluster
-    app.kubernetes.io/instance: devicescluster-sample
+    app.kubernetes.io/instance: devices-cluster
     app.kubernetes.io/part-of: pedge-devices-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: pedge-devices-operator
@@ -12,7 +12,7 @@ spec:
   mqtt:
     sensorsTopic: sensors
   influxdb:
-    name: influxdb
+    # name: influxdb
     namespace: default
     secretReference:
       name: influxdb-auth

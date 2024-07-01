@@ -57,7 +57,7 @@ func (r *DevicesClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if client.IgnoreNotFound(err) == nil {
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "unable to fetch DevicesCluster")
+		logger.Error(err, "unable to fetch DevicesCluster. ")
 		return ctrl.Result{}, err
 	}
 
@@ -174,7 +174,9 @@ log.console.level = debug
 	// TODO we should also block some updates on the devices cluster name - through a validation webhook
 	existingVhost := vhost.DeepCopyObject().(client.Object)
 	if err := r.Get(ctx, client.ObjectKeyFromObject(vhost), existingVhost); err != nil && errors.IsNotFound(err) {
-		return r.Create(ctx, vhost)
+		if err := r.Create(ctx, vhost); err != nil {
+			return err
+		}
 	}
 
 	queue := &rabbitmqtopologyv1.Queue{
@@ -195,7 +197,9 @@ log.console.level = debug
 	// We only create the queue if it doesn't exist. The RabbitMQ messaging topology operator does not allow to modify it.
 	existingQueue := queue.DeepCopyObject().(client.Object)
 	if err := r.Get(ctx, client.ObjectKeyFromObject(queue), existingQueue); err != nil && errors.IsNotFound(err) {
-		return r.Create(ctx, queue)
+		if err := r.Create(ctx, queue); err != nil {
+			return err
+		}
 	}
 
 	var listenerSecret corev1.Secret
@@ -227,8 +231,7 @@ log.console.level = debug
 	// Store MQTT URL/TOPIC/USERNAME/PASSWORD in influxdb-auth in the influxdb namespace
 	if server.Spec.InfluxDB != (pedgev1alpha1.InfluxDB{}) {
 		influxDBSecret := &corev1.Secret{}
-		err := r.Get(ctx, types.NamespacedName{Name: server.Spec.InfluxDB.SecretReference.Name, Namespace: server.Spec.InfluxDB.Namespace}, influxDBSecret)
-		if err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: server.Spec.InfluxDB.SecretReference.Name, Namespace: server.Spec.InfluxDB.Namespace}, influxDBSecret); err != nil {
 			// If a secret name is provided, then it must exist
 			// TODO in such cases, create an Event for the user to understand why their reconcile is failing.
 			return err
