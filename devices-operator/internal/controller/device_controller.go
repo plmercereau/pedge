@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,16 +61,16 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 	logger.Info("Fetched device " + device.Name)
-	// Fetch the referenced Firmware instance
-	var firmware *pedgev1alpha1.Firmware
-	if device.Spec.FirmwareReference != (pedgev1alpha1.FirmwareReference{}) {
-		firmware = &pedgev1alpha1.Firmware{}
-		err := r.Get(ctx, types.NamespacedName{Name: device.Spec.FirmwareReference.Name, Namespace: device.Namespace}, firmware)
-		if err != nil {
-			logger.Error(err, "unable to fetch firmware")
-			return ctrl.Result{}, err
-		}
-	}
+	// Fetch the referenced DeviceClass instance
+	// var deviceClass *pedgev1alpha1.DeviceClass
+	// if device.Spec.DeviceClassReference != (pedgev1alpha1.DeviceClassReference{}) {
+	// 	deviceClass = &pedgev1alpha1.DeviceClass{}
+	// 	err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClassReference.Name, Namespace: device.Namespace}, deviceClass)
+	// 	if err != nil {
+	// 		logger.Error(err, "unable to fetch deviceClass")
+	// 		return ctrl.Result{}, err
+	// 	}
+	// }
 
 	devicesCluster := &pedgev1alpha1.DevicesCluster{}
 	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
@@ -80,7 +79,7 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Sync resources
-	if err := r.syncResources(ctx, device, firmware, devicesCluster); err != nil {
+	if err := r.syncResources(ctx, device, devicesCluster); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -88,7 +87,7 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // syncResources creates or updates the associated resources
-func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alpha1.Device, firmware *pedgev1alpha1.Firmware, devicesCluster *pedgev1alpha1.DevicesCluster) error {
+func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alpha1.Device, devicesCluster *pedgev1alpha1.DevicesCluster) error {
 	logger := log.FromContext(ctx)
 
 	// Secret
@@ -236,175 +235,6 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 		}
 	}
 
-	if firmware != nil {
-		logger.Info("Found firmware. Generating job...")
-		jobName := device.Name + "-firmware-build"
-		builderImage := firmware.Spec.Builder.Image
-		job := &batchv1.Job{}
-		err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: device.Namespace}, job)
-		if err != nil && errors.IsNotFound(err) {
-			logger.Info("Creating new firmware build job " + jobName)
-			service := &corev1.Service{}
-			err := r.Get(ctx, types.NamespacedName{Name: devicesCluster.Name, Namespace: devicesCluster.Namespace}, service)
-			if err != nil {
-				logger.Error(err, "unable to fetch service")
-				return err
-			}
-			// TODO check if the service is a LoadBalancer and has an IP. Warn if more than one IP
-			// TODO use possible custom broker/port values in the DevicesCluster spec
-			serviceIngress := service.Status.LoadBalancer.Ingress[0]
-			var mqttBroker string
-			if serviceIngress.Hostname != "" {
-				mqttBroker = serviceIngress.Hostname
-			} else {
-				mqttBroker = serviceIngress.IP
-			}
-			mqttPortInt := -1
-			for _, port := range service.Spec.Ports {
-				if port.Name == "mqtt" {
-					mqttPortInt = int(port.Port)
-					break
-				}
-			}
-			mqttPort := fmt.Sprint(mqttPortInt)
-			job := &batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      jobName,
-					Namespace: device.Namespace,
-					OwnerReferences: []metav1.OwnerReference{
-						*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
-					},
-				},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						// By setting the annotation, we make sure that the Job is re-triggered when the firmware changes
-						// Re-trigger the job when the firmware, secret changes or service changes
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								// We don't need annotate changes in the firmare as for now only the builder image can change
-								secretVersionAnnotation: secretVersion,
-								serviceAnnotation:       fmt.Sprintf("%s:%s", mqttBroker, mqttPort),
-							},
-						},
-						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{
-								{
-									Name:            "build-firmware",
-									Image:           fmt.Sprintf("%s/%s:%s", builderImage.Registry, builderImage.Repository, builderImage.Tag),
-									ImagePullPolicy: corev1.PullPolicy(builderImage.PullPolicy),
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "firmware",
-											MountPath: "/firmware",
-										},
-									},
-									Env: []corev1.EnvVar{
-										{
-											Name: "GSM_PIN",
-											ValueFrom: &corev1.EnvVarSource{
-												SecretKeyRef: &corev1.SecretKeySelector{
-													LocalObjectReference: corev1.LocalObjectReference{
-														Name: secretName,
-													},
-													Key: "gsm_pin",
-												},
-											},
-										},
-										{
-											Name:  "MQTT_BROKER",
-											Value: mqttBroker,
-										},
-										{
-											Name:  "MQTT_PORT",
-											Value: mqttPort,
-										},
-										{
-											Name:  "DEVICE_NAME",
-											Value: device.Name,
-										},
-										{
-											Name: "MQTT_PASSWORD",
-											ValueFrom: &corev1.EnvVarSource{
-												SecretKeyRef: &corev1.SecretKeySelector{
-													LocalObjectReference: corev1.LocalObjectReference{
-														Name: secretName,
-													},
-													Key: "password",
-												},
-											},
-										},
-									},
-								},
-							},
-							Containers: []corev1.Container{
-								{
-									Name:    "upload-firmware",
-									Image:   "amazon/aws-cli:2.16.6",
-									Command: []string{"sh", "-c", fmt.Sprintf("aws --no-verify-ssl s3 cp /firmware/firmware.bin s3://%s/%s.bin", bucketName, device.Name)},
-									Env: []corev1.EnvVar{
-										{
-											Name:  "AWS_ENDPOINT_URL_S3",
-											Value: fmt.Sprintf("https://minio.%s.svc.cluster.local", devicesCluster.Namespace),
-										},
-										{
-											Name:  "AWS_DEFAULT_REGION",
-											Value: bucketRegion,
-										},
-										{
-											Name: "AWS_ACCESS_KEY_ID",
-											ValueFrom: &corev1.EnvVarSource{
-												SecretKeyRef: &corev1.SecretKeySelector{
-													LocalObjectReference: corev1.LocalObjectReference{
-														Name: devicesCluster.Name + devicesClusterSecretSuffix,
-													},
-													Key: s3AccessKeyId,
-												},
-											},
-										},
-										{
-											Name: "AWS_SECRET_ACCESS_KEY",
-											ValueFrom: &corev1.EnvVarSource{
-												SecretKeyRef: &corev1.SecretKeySelector{
-													LocalObjectReference: corev1.LocalObjectReference{
-														Name: devicesCluster.Name + devicesClusterSecretSuffix,
-													},
-													Key: s3SecretAccessKey,
-												},
-											},
-										},
-									},
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "firmware",
-											MountPath: "/firmware",
-										},
-									},
-								},
-							},
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-							Volumes: []corev1.Volume{
-								{
-									Name: "firmware",
-									VolumeSource: corev1.VolumeSource{
-										EmptyDir: &corev1.EmptyDirVolumeSource{},
-									},
-								},
-							},
-						},
-					},
-					BackoffLimit: func(i int32) *int32 { return &i }(4),
-				},
-			}
-			// Set the ownerRef for the Job to ensure it gets cleaned up when the device is deleted
-			if err := ctrl.SetControllerReference(device, job, r.Scheme); err != nil {
-				return err
-			}
-			if err := r.CreateOrUpdate(ctx, job); err != nil {
-				return err
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -449,10 +279,10 @@ func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
-		// Watch for changes in the firmware of the device
+		// Watch for changes in the class of the device
 		Watches(
-			&pedgev1alpha1.Firmware{},
-			handler.EnqueueRequestsFromMapFunc(r.findObjectsForFirmware),
+			&pedgev1alpha1.DeviceClass{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForDeviceClass),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		// Watch for changes in the service exposing the devices cluster
@@ -489,11 +319,11 @@ func (r *DeviceReconciler) findObjectsForSecret(ctx context.Context, secret clie
 	return requests
 }
 
-func (r *DeviceReconciler) findObjectsForFirmware(ctx context.Context, firmware client.Object) []reconcile.Request {
+func (r *DeviceReconciler) findObjectsForDeviceClass(ctx context.Context, deviceClass client.Object) []reconcile.Request {
 	attachedDevices := &pedgev1alpha1.DeviceList{}
 	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(".spec.firmwareReference.name", firmware.GetName()),
-		Namespace:     firmware.GetNamespace(),
+		FieldSelector: fields.OneTermEqualSelector(".spec.deviceClassReference.name", deviceClass.GetName()),
+		Namespace:     deviceClass.GetNamespace(),
 	}
 	err := r.List(ctx, attachedDevices, listOps)
 	if err != nil {

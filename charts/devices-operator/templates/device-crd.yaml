@@ -35,12 +35,12 @@ spec:
           spec:
             description: DeviceSpec defines the desired state of Device
             properties:
-              devicesClusterReference:
+              deviceClassReference:
                 properties:
                   name:
                     type: string
                 type: object
-              firmwareReference:
+              devicesClusterReference:
                 properties:
                   name:
                     type: string

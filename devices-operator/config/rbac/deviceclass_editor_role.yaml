@@ -1,0 +1,31 @@
+# permissions for end users to edit deviceclasses.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: deviceclass-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: pedge-devices
+    app.kubernetes.io/part-of: pedge-devices
+    app.kubernetes.io/managed-by: kustomize
+  name: deviceclass-editor-role
+rules:
+  - apiGroups:
+      - devices.pedge.io
+    resources:
+      - deviceclasses
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - devices.pedge.io
+    resources:
+      - deviceclasses/status
+    verbs:
+      - get

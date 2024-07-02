@@ -9,7 +9,7 @@ type DevicesClusterReference struct {
 	Name string `json:"name,omitempty"`
 }
 
-type FirmwareReference struct {
+type DeviceClassReference struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name,omitempty"`
 }
@@ -19,7 +19,7 @@ type DeviceSpec struct {
 	// +kubebuilder:validation:Required
 	DevicesClusterReference DevicesClusterReference `json:"devicesClusterReference"`
 	// +kubebuilder:validation:Optional
-	FirmwareReference FirmwareReference `json:"firmwareReference,omitempty"`
+	DeviceClasseReference DeviceClassReference `json:"deviceClassReference,omitempty"`
 }
 
 // DeviceStatus defines the observed state of Device

@@ -47,6 +47,26 @@ rules:
 - apiGroups:
   - devices.pedge.io
   resources:
+  - deviceclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - deviceclasses/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - devices.pedge.io
+  resources:
   - devices
   verbs:
   - create
@@ -84,38 +104,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - firmwares
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - firmwares/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - minio.min.io
-  resources:
-  - tenants
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - rabbitmq.com
   resources:

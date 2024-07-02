@@ -144,11 +144,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.FirmwareReconciler{
+	if err = (&controller.DeviceClassReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Firmware")
+		setupLog.Error(err, "unable to create controller", "controller", "DeviceClass")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

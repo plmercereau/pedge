@@ -2,5 +2,6 @@
 resources:
   - devices_v1alpha1_device.yaml
   - devices_v1alpha1_devicescluster.yaml
-  - devices_v1alpha1_firmware.yaml
+  - devices_v1alpha1_deviceclass.yaml
+  - minio_tenant.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

@@ -1,0 +1,59 @@
+apiVersion: v1
+data:
+  CONSOLE_ACCESS_KEY: Y29uc29sZQ==
+  CONSOLE_SECRET_KEY: Y29uc29sZTEyMw==
+kind: Secret
+metadata:
+  name: storage-user
+type: Opaque
+
+---
+apiVersion: minio.min.io/v2
+kind: Tenant
+metadata:
+  name: myminio
+
+spec:
+  features:
+    bucketDNS: false
+    domains: {}
+  users:
+    - name: storage-user
+  certConfig: {}
+  podManagementPolicy: Parallel
+  configuration:
+    name: storage-configuration
+  env: []
+  serviceMetadata:
+    minioServiceLabels: {}
+    minioServiceAnnotations: {}
+    consoleServiceLabels: {}
+    consoleServiceAnnotations: {}
+  priorityClassName: ""
+  externalCaCertSecret: []
+  externalCertSecret: []
+  externalClientCertSecrets: []
+  image: quay.io/minio/minio:RELEASE.2024-05-01T01-11-10Z
+  imagePullSecret: {}
+  mountPath: /export
+  subPath: ""
+  serviceAccountName: ""
+  pools:
+    - servers: 4
+      name: minio-pool-default
+      volumesPerServer: 4
+      volumeClaimTemplate:
+        apiVersion: v1
+        kind: persistentvolumeclaims
+        metadata: {}
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
+  buckets:
+    - name: firmwares
+      region: default
+      objectLocking: false
+  requestAutoCert: true

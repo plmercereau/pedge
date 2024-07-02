@@ -35,7 +35,7 @@ resources:
     controller: true
     domain: pedge.io
     group: devices
-    kind: Firmware
+    kind: DeviceClass
     path: github.com/plmercereau/pedge/api/v1alpha1
     version: v1alpha1
 version: "3"

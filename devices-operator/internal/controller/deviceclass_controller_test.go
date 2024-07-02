@@ -30,7 +30,7 @@ import (
 	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 )
 
-var _ = Describe("Firmware Controller", func() {
+var _ = Describe("DeviceClass Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("Firmware Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		firmware := &pedgev1alpha1.Firmware{}
+		deviceClass := &pedgev1alpha1.DeviceClass{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind Firmware")
-			err := k8sClient.Get(ctx, typeNamespacedName, firmware)
+			By("creating the custom resource for the Kind DeviceClass")
+			err := k8sClient.Get(ctx, typeNamespacedName, deviceClass)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &pedgev1alpha1.Firmware{
+				resource := &pedgev1alpha1.DeviceClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("Firmware Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &pedgev1alpha1.Firmware{}
+			resource := &pedgev1alpha1.DeviceClass{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance Firmware")
+			By("Cleanup the specific resource instance DeviceClass")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &FirmwareReconciler{
+			controllerReconciler := &DeviceClassReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

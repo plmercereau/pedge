@@ -18,13 +18,14 @@ type FirmwareBuilder struct {
 	Image FirmwareBuilderImage `json:"image,omitempty"`
 }
 
-// FirmwareSpec defines the desired state of Firmware
-type FirmwareSpec struct {
+// DeviceClassSpec defines the desired state of DeviceClass
+type DeviceClassSpec struct {
+	// +kubebuilder:validation:Optional
 	Builder FirmwareBuilder `json:"builder,omitempty"`
 }
 
-// FirmwareStatus defines the observed state of Firmware
-type FirmwareStatus struct {
+// DeviceClassStatus defines the observed state of DeviceClass
+type DeviceClassStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -32,24 +33,24 @@ type FirmwareStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Firmware is the Schema for the firmwares API
-type Firmware struct {
+// DeviceClass is the Schema for the deviceClasses API
+type DeviceClass struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   FirmwareSpec   `json:"spec,omitempty"`
-	Status FirmwareStatus `json:"status,omitempty"`
+	Spec   DeviceClassSpec   `json:"spec,omitempty"`
+	Status DeviceClassStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// FirmwareList contains a list of Firmware
-type FirmwareList struct {
+// DeviceClassList contains a list of DeviceClass
+type DeviceClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Firmware `json:"items"`
+	Items           []DeviceClass `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Firmware{}, &FirmwareList{})
+	SchemeBuilder.Register(&DeviceClass{}, &DeviceClassList{})
 }
