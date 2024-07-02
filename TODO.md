@@ -1,11 +1,18 @@
-- before the following:
-
-  - understand how esp32 encryption works
-    - we may need to generate and store an encryption key in a secret - but it seems esp-idf works without it
-    - can we build/install/reinstall the firmware code without the encryption key?
-    - can we "only" encrypt the SVN? In that case, we could build it from a job dependent on the `device` resource, and store the result into an s3 object
-
 - validation hooks
+- device sensors
+  - should we determine sensors when building the firmware, or in the config partition/file?
+- device config partition/file
+  - config-builder-esp32 docker image
+    - mount secrets as volumes, and generate the csv file, then generate the bin
+      - https://chatgpt.com/share/3e202c7f-90b0-4863-81f1-6f8847e84d86
+  - store the .bin in the device secret as `config.bin`
+- builders
+  - copy firmware but also partitions and bootloader
+- flash scripts per device class
+  - flash firmware + bootloader + partitions
+  - fetch config from Kubernetes
+  - flash config (nvs)
+  - where to store the script? Inside the deviceClass artefact? Into a device artefact? ???
 - review "firmware"
   - Device
     - spec.deviceClassReference.name
@@ -16,7 +23,10 @@
         - each DeviceClass would have a `spec.config.builder` docker image
         - avoid an infinite loop: https://chatgpt.com/share/618cc21b-1c80-41c3-b242-e65b0e96e6bd
   - DeviceClass spec
-    - `spec.firmware.builder` (same as firmware.spec.builder)
+    - `spec.firmware.builder`
+      - same as firmware.spec.builder
+      - accept arguments
+        - and adapt the `esp32` builder to build either `esp32-cam` or `sim7600`
     - specific device class-wide secrets - how, maybe a list of secret keys in the specs e.g.
       - `deviceClass.<name>.secrets.keys = ["PROVISIONNER_WIFI_SSID"]`
       - `secret.<name>-device-class.stringData.PROVISIONNER_WIFI_SSID = "abcd"`
@@ -35,7 +45,14 @@
       - try to open the file and save its key-values to NVS
     - how to build
       - with a file and a partition
-      - without a file - would it keep the secrets
+      - without a file - would it keep the secret
+  - DeviceGroup
+    - used for loading common settings e.g. wifi settings
+    - use a selector e.g. on labels
+      - the selector would then be used to mount the secret in the config builder
+        - device > device group > device class > devices cluster
+        - think of another label to sort device groups e.g. `priority`
+    - `spec.secret.name`
 - develop a rancher UI interface
 
   - CRUD devices
@@ -56,9 +73,12 @@
 
 ## Next
 
-- review the firmware build/flash system
-  - store secrets using NVS / efuse
-- secure firmware - efuse etc
+- encrypt the config partition (and the firmware, too)
+- wifi change over Bluetooth
+- way to structure MQTT messages
+  - https://github.com/homieiot/convention
+  - Tasmota conventions
+  - Sparkplug B conventions
 - OTA upgrades over MQTT/HTTPS
   - https://chatgpt.com/share/c35ae778-766e-41ca-adc1-1f3021af7fd8
 - OLM: overkill
