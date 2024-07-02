@@ -28,7 +28,6 @@ import (
 const (
 	// The suffix should not change: the rabbitmq operator takes ownership of it,
 	// and still creates a -user-credentials secret even when asked otherwise. Investigate.
-	// ! TODO The secret seems to be always created in the "default" namespace, even when the device is in another namespace!!!
 	deviceSecretSuffix      = "-user-credentials"
 	secretNameLabel         = "pedge.io/secret-name"
 	secretVersionAnnotation = "pedge.io/secret-version"
