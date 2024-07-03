@@ -61,6 +61,7 @@
                   yq-go
                   act
                   esptool
+                  minio-client
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                   (
                     # operator-sdk package not working

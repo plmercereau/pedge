@@ -15,7 +15,7 @@ helm_resource('cert-manager',
 helm_resource('rabbitmq-cluster-operator', 
     'oci://registry-1.docker.io/bitnamicharts/rabbitmq-cluster-operator', 
     namespace='rabbitmq-system',
-    flags = ['--version=4.2.10', '--set=useCertManager=true', '--create-namespace'],
+    flags = ['--version=4.2.10', '--create-namespace', '--set=useCertManager=true'],
     resource_deps = [ 'cert-manager'])
 
 helm_repo('minio', 'https://operator.min.io')
@@ -30,7 +30,7 @@ k8s_yaml(kustomize('./examples/manifests'))
 # TODO ideally we should create a separate resource, this puts stuff in the devices operator
 # TODO e.g. [event: tenant devices-cluster] Tenant is missing root credentials
 k8s_resource('pedge-devices-controller-manager', 
-    objects=['devices-cluster:Tenant:default'],
+    objects=['storage:Tenant:default'],
     resource_deps=['rabbitmq-cluster-operator', 'minio-operator'])
 
 # TODO wait for rabbitmq-cluster-operator

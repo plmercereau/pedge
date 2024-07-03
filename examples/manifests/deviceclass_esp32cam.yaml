@@ -12,7 +12,7 @@ spec:
       - name: TARGET
         value: esp32cam
   storage:
-    endpoint: https://minio.minio.svc.cluster.local
+    endpoint: https://minio.default.svc
     bucket: firmwares
     accessKey:
       secretKeyRef:

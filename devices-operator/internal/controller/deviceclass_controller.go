@@ -42,7 +42,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("Found device class", deviceClass.Name)
+	logger.Info("Found device class", "deviceClass", deviceClass.Name)
 	jobName := deviceClass.Name + "-firmware-build"
 	builderImage := deviceClass.Spec.Builder.Image
 
@@ -166,7 +166,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Create the Job if it does not exist
-			logger.Info("Creating new Job", "job", jobName)
+			logger.Info("Creating new Job ", "job", jobName)
 			if err := r.Create(ctx, desiredJob); err != nil {
 				logger.Error(err, "Failed to create new Job", "job", jobName)
 				return ctrl.Result{}, err
