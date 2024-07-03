@@ -1,7 +1,7 @@
 apiVersion: devices.pedge.io/v1alpha1
 kind: DevicesCluster
 metadata:
-  name: devices-cluster
+  name: my-cluster
 spec:
   mqtt:
     sensorsTopic: sensors

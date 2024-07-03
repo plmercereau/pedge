@@ -1,17 +1,10 @@
 apiVersion: devices.pedge.io/v1alpha1
 kind: DeviceClass
 metadata:
-  labels:
-    app.kubernetes.io/name: deviceclass
-    app.kubernetes.io/instance: deviceclass-sample
-    app.kubernetes.io/part-of: pedge-devices-operator
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: pedge-devices-operator
   name: deviceclass-sample
 spec:
   builder:
     image:
-      registry: ghcr.io
-      repository: plmercereau/firmware-builder-esp32-sim7600
+      repository: ghcr.io/plmercereau/pedge/firmware-builder-esp32
       tag: latest
       pullPolicy: Always

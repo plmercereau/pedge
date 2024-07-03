@@ -1,9 +1,9 @@
 apiVersion: devices.pedge.io/v1alpha1
 kind: Device
 metadata:
-  name: device-sample
+  name: esp32cam
 spec:
   devicesClusterReference:
-    name: devices-cluster
+    name: my-cluster
   deviceClassReference:
-    name: deviceclass-sample
+    name: esp32cam

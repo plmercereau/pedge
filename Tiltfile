@@ -25,9 +25,20 @@ helm_resource('minio-operator',
     flags = ['--version=5.0.15', '--create-namespace']
 )
 
+k8s_yaml(kustomize('./examples/manifests'))
+
+# TODO ideally we should create a separate resource, this puts stuff in the devices operator
+# TODO e.g. [event: tenant devices-cluster] Tenant is missing root credentials
+k8s_resource('pedge-devices-controller-manager', 
+    objects=['devices-cluster:Tenant:default'],
+    resource_deps=['rabbitmq-cluster-operator', 'minio-operator'])
+
 # TODO wait for rabbitmq-cluster-operator
 k8s_yaml(helm('./charts/influxdb-grafana', values=['./charts/influxdb-grafana/values.yaml']))
 
 docker_build('ghcr.io/plmercereau/pedge/devices-operator:0.0.1', './devices-operator')
+
+k8s_kind('DeviceClass', image_object={'json_path': '{.spec.builder.image}', 'repo_field': 'repository', 'tag_field': 'tag'})
+docker_build('ghcr.io/plmercereau/pedge/firmware-builder-esp32:latest', './firmware-builders/esp32')
 
 k8s_yaml(kustomize ( './devices-operator/config/default'))

@@ -8,7 +8,6 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 type FirmwareBuilderImage struct {
-	Registry   string          `json:"registry,omitempty"`
 	Repository string          `json:"repository,omitempty"`
 	Tag        string          `json:"tag,omitempty"`
 	PullPolicy core.PullPolicy `json:"pullPolicy,omitempty"`
@@ -16,12 +15,27 @@ type FirmwareBuilderImage struct {
 
 type FirmwareBuilder struct {
 	Image FirmwareBuilderImage `json:"image,omitempty"`
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	Env []core.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+type Storage struct {
+	Endpoint  string             `json:"endpoint,omitempty"`
+	Bucket    string             `json:"bucket,omitempty"`
+	AccessKey *core.EnvVarSource `json:"accessKey,omitempty"`
+	SecretKey *core.EnvVarSource `json:"secretKey,omitempty"`
 }
 
 // DeviceClassSpec defines the desired state of DeviceClass
 type DeviceClassSpec struct {
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Required
 	Builder FirmwareBuilder `json:"builder,omitempty"`
+	// +kubebuilder:validation:Required
+	Storage Storage `json:"storage,omitempty"`
 }
 
 // DeviceClassStatus defines the observed state of DeviceClass

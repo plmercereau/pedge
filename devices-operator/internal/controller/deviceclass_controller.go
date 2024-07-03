@@ -42,11 +42,12 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	if deviceClass.Spec.Builder != (pedgev1alpha1.FirmwareBuilder{}) {
-		logger.Info("Found firmware builder. Generating job...")
-		jobName := deviceClass.Name + "-firmware-build"
-		builderImage := deviceClass.Spec.Builder.Image
+	logger.Info("Found device class", deviceClass.Name)
+	jobName := deviceClass.Name + "-firmware-build"
+	builderImage := deviceClass.Spec.Builder.Image
 
+	/*
+		// TODO put this in the config!!!
 		service := &corev1.Service{}
 		// TODO that's a tricky one, we need to link the minio service to the firmware job
 		err := r.Get(ctx, types.NamespacedName{Name: "devicesCluster.Name", Namespace: "devicesCluster.Namespace"}, service)
@@ -72,144 +73,163 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			}
 		}
 		mqttPort := fmt.Sprint(mqttPortInt)
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      jobName,
-				Namespace: deviceClass.Namespace,
-				OwnerReferences: []metav1.OwnerReference{
-					*metav1.NewControllerRef(deviceClass, pedgev1alpha1.GroupVersion.WithKind("DeviceClass")),
+	*/
+	desiredJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: deviceClass.Namespace,
+			Labels: map[string]string{
+				"job-name": jobName,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"job-name": jobName,
 				},
 			},
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					// By setting the annotation, we make sure that the Job is re-triggered when the deviceClass changes
-					// Re-trigger the job when the deviceClass, secret changes or service changes
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							// ??? We don't need annotate changes in the firmare as for now only the builder image can change
-							serviceAnnotation: fmt.Sprintf("%s:%s", mqttBroker, mqttPort),
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"job-name": jobName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name:            "build-firmware",
+							Image:           fmt.Sprintf("%s:%s", builderImage.Repository, builderImage.Tag),
+							ImagePullPolicy: builderImage.PullPolicy,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "firmware",
+									MountPath: "/firmware",
+								},
+							},
+							Env: deviceClass.Spec.Builder.Env,
 						},
 					},
-					Spec: corev1.PodSpec{
-						InitContainers: []corev1.Container{
-							{
-								Name:            "build-firmware",
-								Image:           fmt.Sprintf("%s/%s:%s", builderImage.Registry, builderImage.Repository, builderImage.Tag),
-								ImagePullPolicy: builderImage.PullPolicy,
-								VolumeMounts: []corev1.VolumeMount{
-									{
-										Name:      "firmware",
-										MountPath: "/firmware",
-									},
+					Containers: []corev1.Container{
+						{
+							Name:    "upload-firmware",
+							Image:   "amazon/aws-cli:2.16.6",
+							Command: []string{"sh", "-c", fmt.Sprintf("aws --no-verify-ssl s3 cp /firmware/firmware.bin s3://%s/%s.bin", deviceClass.Spec.Storage.Bucket, deviceClass.Name)},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "AWS_ENDPOINT_URL_S3",
+									Value: deviceClass.Spec.Storage.Endpoint,
 								},
-								Env: []corev1.EnvVar{},
-							},
-						},
-						Containers: []corev1.Container{
-							{
-								Name:  "upload-firmware",
-								Image: "amazon/aws-cli:2.16.6",
-								// TODO get "firmware" bucket name and credentials
-								Command: []string{"sh", "-c", fmt.Sprintf("aws --no-verify-ssl s3 cp /firmware/firmware.bin s3://%s/%s.bin", "firmware", deviceClass.Name)},
-								Env:     []corev1.EnvVar{
-									// {
-									// 	Name: "AWS_ENDPOINT_URL_S3",
-									// 	// TODO that's a tricky one, we need to link the minio service to the firmware job
-									// 	Value: fmt.Sprintf("https://minio.%s.svc.cluster.local", devicesCluster.Namespace),
-									// },
-									// {
-									// 	Name:  "AWS_DEFAULT_REGION",
-									// 	Value: bucketRegion,
-									// },
-									// {
-									// 	Name: "AWS_ACCESS_KEY_ID",
-									// 	ValueFrom: &corev1.EnvVarSource{
-									// 		SecretKeyRef: &corev1.SecretKeySelector{
-									// 			LocalObjectReference: corev1.LocalObjectReference{
-									// 				Name: devicesCluster.Name + devicesClusterSecretSuffix,
-									// 			},
-									// 			Key: s3AccessKeyId,
-									// 		},
-									// 	},
-									// },
-									// {
-									// 	Name: "AWS_SECRET_ACCESS_KEY",
-									// 	ValueFrom: &corev1.EnvVarSource{
-									// 		SecretKeyRef: &corev1.SecretKeySelector{
-									// 			LocalObjectReference: corev1.LocalObjectReference{
-									// 				Name: devicesCluster.Name + devicesClusterSecretSuffix,
-									// 			},
-									// 			Key: s3SecretAccessKey,
-									// 		},
-									// 	},
-									// },
+								// {
+								// 	Name:  "AWS_DEFAULT_REGION",
+								// 	Value: bucketRegion,
+								// },
+								{
+									Name:      "AWS_ACCESS_KEY_ID",
+									ValueFrom: deviceClass.Spec.Storage.AccessKey,
 								},
-								VolumeMounts: []corev1.VolumeMount{
-									{
-										Name:      "firmware",
-										MountPath: "/firmware",
-									},
+								{
+									Name:      "AWS_SECRET_ACCESS_KEY",
+									ValueFrom: deviceClass.Spec.Storage.SecretKey,
 								},
 							},
-						},
-						RestartPolicy: corev1.RestartPolicyOnFailure,
-						Volumes: []corev1.Volume{
-							{
-								Name: "firmware",
-								VolumeSource: corev1.VolumeSource{
-									EmptyDir: &corev1.EmptyDirVolumeSource{},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "firmware",
+									MountPath: "/firmware",
 								},
 							},
 						},
 					},
+					RestartPolicy: corev1.RestartPolicyOnFailure,
+					Volumes: []corev1.Volume{
+						{
+							Name: "firmware",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
 				},
-				BackoffLimit: func(i int32) *int32 { return &i }(4),
 			},
-		}
-		// Set the ownerRef for the Job to ensure it gets cleaned up when the deviceClass is deleted
-		if err := ctrl.SetControllerReference(deviceClass, job, r.Scheme); err != nil {
+			BackoffLimit: func(i int32) *int32 { return &i }(4),
+		},
+	}
+
+	// Set the ownerRef for the Job to ensure it gets cleaned up when the deviceClass is deleted
+	if err := ctrl.SetControllerReference(deviceClass, desiredJob, r.Scheme); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Check if the Job already exists
+	existingJob := &batchv1.Job{}
+	err = r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: deviceClass.Namespace}, existingJob)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Create the Job if it does not exist
+			logger.Info("Creating new Job", "job", jobName)
+			if err := r.Create(ctx, desiredJob); err != nil {
+				logger.Error(err, "Failed to create new Job", "job", jobName)
+				return ctrl.Result{}, err
+			}
+		} else {
+			logger.Error(err, "Failed to get Job", "job", jobName)
 			return ctrl.Result{}, err
 		}
-		if err := r.CreateOrUpdate(ctx, job); err != nil {
-			return ctrl.Result{}, err
+	} else {
+		// Compare the existing Job with the desired Job
+		if !jobSpecMatches(existingJob, desiredJob) {
+			// If the Job specs differ, delete the existing Job and create a new one
+			logger.Info("Deleting existing Job", "job", jobName)
+			if err := r.Delete(ctx, existingJob); err != nil {
+				logger.Error(err, "Failed to delete existing Job", "job", jobName)
+				return ctrl.Result{}, err
+			}
+			logger.Info("Creating new Job", "job", jobName)
+			if err := r.Create(ctx, desiredJob); err != nil {
+				logger.Error(err, "Failed to create new Job", "job", jobName)
+				return ctrl.Result{}, err
+			}
 		}
 	}
+
 	return ctrl.Result{}, nil
 }
 
-// CreateOrUpdate creates or updates a resource
-func (r *DeviceClassReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
-	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
-	existing := obj.DeepCopyObject().(client.Object)
-	err := r.Get(ctx, key, existing)
-	if err != nil {
-		if client.IgnoreNotFound(err) == nil {
-			return r.Create(ctx, obj)
-		}
-		return err
+// jobSpecMatches checks if two job specs match
+func jobSpecMatches(existingJob, newJob *batchv1.Job) bool {
+	// Add your comparison logic here, comparing fields in existingJob.Spec and newJob.Spec
+	// Return true if they match, false otherwise
+
+	// For simplicity, we just check labels and some key fields here
+	if !equalMaps(existingJob.Labels, newJob.Labels) ||
+		existingJob.Spec.Template.Spec.RestartPolicy != newJob.Spec.Template.Spec.RestartPolicy ||
+		len(existingJob.Spec.Template.Spec.InitContainers) != len(newJob.Spec.Template.Spec.InitContainers) ||
+		len(existingJob.Spec.Template.Spec.Containers) != len(newJob.Spec.Template.Spec.Containers) {
+		return false
 	}
-	for i := 0; i < 5; i++ { // Retry up to 5 times
-		obj.SetResourceVersion(existing.GetResourceVersion())
-		err = r.Update(ctx, obj)
-		if err == nil {
-			return nil
-		}
-		if errors.IsConflict(err) {
-			// Fetch the latest version of the object
-			err = r.Get(ctx, key, existing)
-			if err != nil {
-				return err
-			}
-		} else {
-			return err
+
+	// Add more comparison logic as needed
+
+	return true
+}
+
+// equalMaps checks if two maps are equal
+func equalMaps(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
 		}
 	}
-	return fmt.Errorf("failed to update resource %s/%s after multiple attempts: %w", obj.GetNamespace(), obj.GetName(), err)
+	return true
 }
 
 // SetupWithManager sets up the controller with the Manager
 func (r *DeviceClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.DeviceClass{}).
+		Owns(&batchv1.Job{}).
 		Complete(r)
 }

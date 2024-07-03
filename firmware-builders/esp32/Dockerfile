@@ -19,4 +19,5 @@ RUN platformio pkg install
 
 COPY . ./
 
+ENV TARGET="esp32dev"
 CMD ["/workspace/build.sh"]

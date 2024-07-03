@@ -1,0 +1,24 @@
+apiVersion: devices.pedge.io/v1alpha1
+kind: DeviceClass
+metadata:
+  name: esp32cam
+spec:
+  builder:
+    image:
+      repository: ghcr.io/plmercereau/pedge/firmware-builder-esp32
+      tag: latest
+      pullPolicy: IfNotPresent
+    env:
+      - name: TARGET
+        value: esp32cam
+  storage:
+    endpoint: https://minio.minio.svc.cluster.local
+    bucket: firmwares
+    accessKey:
+      secretKeyRef:
+        name: storage-user
+        key: CONSOLE_ACCESS_KEY
+    secretKey:
+      secretKeyRef:
+        name: storage-user
+        key: CONSOLE_SECRET_KEY

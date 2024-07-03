@@ -1,0 +1,5 @@
+resources:
+  - devicescluster.yaml
+  - deviceclass_esp32cam.yaml
+  - device_esp32cam.yaml
+  - minio_tenant.yaml
