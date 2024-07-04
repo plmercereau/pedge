@@ -8,6 +8,7 @@ import (
 	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -36,12 +37,14 @@ type DevicesClusterReconciler struct {
 //+kubebuilder:rbac:groups=devices.pedge.io,resources=devicesclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=devices.pedge.io,resources=devicesclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=secrets;serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rabbitmq.com,resources=rabbitmqclusters;vhosts;queues;permissions;topicpermissions;users,verbs=get;list;watch;create;update;patch;delete
+// TODO allow to crud roles, role bindinfs, and service accounts
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 
 func (r *DevicesClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-
+	// TODO rename 'server' to 'devicesCluster'
 	// Fetch the DevicesCluster instance
 	server := &pedgev1alpha1.DevicesCluster{}
 	err := r.Get(ctx, req.NamespacedName, server)
@@ -166,6 +169,55 @@ log.console.level = debug
 		}
 	}
 
+	// Create a service account to use in the configuration build job so it can patch the device secret
+	serviceAccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      server.Name + "-config-builder",
+			Namespace: server.Namespace,
+		},
+	}
+	if err := controllerutil.SetOwnerReference(server, serviceAccount, r.Scheme); err != nil {
+		return err
+
+	}
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      server.Name + "-config-builder",
+			Namespace: server.Namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
+				Verbs:     []string{"get", "patch"},
+			},
+		},
+	}
+	if err := controllerutil.SetOwnerReference(server, role, r.Scheme); err != nil {
+		return err
+	}
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      server.Name + "-config-builder",
+			Namespace: server.Namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      serviceAccount.Name,
+				Namespace: serviceAccount.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     role.Name,
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+	if err := controllerutil.SetOwnerReference(server, roleBinding, r.Scheme); err != nil {
+		return err
+	}
+
 	// Store MQTT URL/TOPIC/USERNAME/PASSWORD in influxdb-auth in the influxdb namespace
 	if server.Spec.InfluxDB != (pedgev1alpha1.InfluxDB{}) {
 		influxDBSecret := &corev1.Secret{}
@@ -287,7 +339,7 @@ log.console.level = debug
 	}
 	// controllerutil.SetOwnerReference(server, listenerTopicPermission, r.Scheme)
 
-	resources := []client.Object{cluster, listenerUser, listenerPermission, listenerTopicPermission}
+	resources := []client.Object{cluster, listenerUser, listenerPermission, listenerTopicPermission, role, serviceAccount, roleBinding}
 	for _, res := range resources {
 		if err := r.CreateOrUpdate(ctx, res); err != nil {
 			return err

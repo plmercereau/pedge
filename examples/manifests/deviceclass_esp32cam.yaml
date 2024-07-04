@@ -11,6 +11,11 @@ spec:
     env:
       - name: TARGET
         value: esp32cam
+  config:
+    image:
+      repository: ghcr.io/plmercereau/pedge/config-builder-esp32
+      tag: latest
+      pullPolicy: IfNotPresent
   storage:
     endpoint: https://minio.default.svc
     bucket: firmwares

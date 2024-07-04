@@ -46,34 +46,6 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	jobName := deviceClass.Name + "-firmware-build"
 	builderImage := deviceClass.Spec.Builder.Image
 
-	/*
-		// TODO put this in the config!!!
-		service := &corev1.Service{}
-		// TODO that's a tricky one, we need to link the minio service to the firmware job
-		err := r.Get(ctx, types.NamespacedName{Name: "devicesCluster.Name", Namespace: "devicesCluster.Namespace"}, service)
-		// ! err := r.Get(ctx, types.NamespacedName{Name: devicesCluster.Name, Namespace: devicesCluster.Namespace}, service)
-		if err != nil {
-			logger.Error(err, "unable to fetch service")
-			return ctrl.Result{}, err
-		}
-		// TODO check if the service is a LoadBalancer and has an IP. Warn if more than one IP
-		// TODO use possible custom broker/port values in the DevicesCluster spec
-		serviceIngress := service.Status.LoadBalancer.Ingress[0]
-		var mqttBroker string
-		if serviceIngress.Hostname != "" {
-			mqttBroker = serviceIngress.Hostname
-		} else {
-			mqttBroker = serviceIngress.IP
-		}
-		mqttPortInt := -1
-		for _, port := range service.Spec.Ports {
-			if port.Name == "mqtt" {
-				mqttPortInt = int(port.Port)
-				break
-			}
-		}
-		mqttPort := fmt.Sprint(mqttPortInt)
-	*/
 	desiredJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -193,37 +165,6 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// jobSpecMatches checks if two job specs match
-func jobSpecMatches(existingJob, newJob *batchv1.Job) bool {
-	// Add your comparison logic here, comparing fields in existingJob.Spec and newJob.Spec
-	// Return true if they match, false otherwise
-
-	// For simplicity, we just check labels and some key fields here
-	if !equalMaps(existingJob.Labels, newJob.Labels) ||
-		existingJob.Spec.Template.Spec.RestartPolicy != newJob.Spec.Template.Spec.RestartPolicy ||
-		len(existingJob.Spec.Template.Spec.InitContainers) != len(newJob.Spec.Template.Spec.InitContainers) ||
-		len(existingJob.Spec.Template.Spec.Containers) != len(newJob.Spec.Template.Spec.Containers) {
-		return false
-	}
-
-	// Add more comparison logic as needed
-
-	return true
-}
-
-// equalMaps checks if two maps are equal
-func equalMaps(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 // SetupWithManager sets up the controller with the Manager

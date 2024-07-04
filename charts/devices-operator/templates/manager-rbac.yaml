@@ -39,6 +39,19 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - secrets
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - get
@@ -127,6 +140,19 @@ rules:
   - permissions
   - topicpermissions
   - users
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
   verbs:
   - create
   - delete

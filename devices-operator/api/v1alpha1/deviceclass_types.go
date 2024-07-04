@@ -23,6 +23,10 @@ type FirmwareBuilder struct {
 	Env []core.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
+type ConfigBuilder struct {
+	Image FirmwareBuilderImage `json:"image,omitempty"`
+}
+
 type Storage struct {
 	Endpoint  string             `json:"endpoint,omitempty"`
 	Bucket    string             `json:"bucket,omitempty"`
@@ -34,6 +38,8 @@ type Storage struct {
 type DeviceClassSpec struct {
 	// +kubebuilder:validation:Required
 	Builder FirmwareBuilder `json:"builder,omitempty"`
+	// +kubebuilder:validation:Required
+	Config ConfigBuilder `json:"config,omitempty"`
 	// +kubebuilder:validation:Required
 	Storage Storage `json:"storage,omitempty"`
 }
