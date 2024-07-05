@@ -52,6 +52,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - secrets/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - get

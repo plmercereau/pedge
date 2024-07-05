@@ -173,7 +173,7 @@ log.console.level = debug
 	// Create a service account to use in the configuration build job so it can patch the device secret
 	serviceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name + "-config-builder",
+			Name:      server.Name + configBuilderJobSuffix,
 			Namespace: server.Namespace,
 		},
 	}

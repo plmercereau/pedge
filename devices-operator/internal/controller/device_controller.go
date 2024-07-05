@@ -2,8 +2,6 @@ package controller
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 
 	"time"
@@ -13,11 +11,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
-	hashutils "k8s.io/kubernetes/pkg/util/hash"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,11 +31,8 @@ import (
 const (
 	// The suffix should not change: the rabbitmq operator takes ownership of it,
 	// and still creates a -user-credentials secret even when asked otherwise. Investigate.
-	deviceSecretSuffix        = "-user-credentials"
-	secretNameLabel           = "pedge.io/secret-name"
-	buildConfigHashAnnotation = "pedge.io/build-config-hash"
-	mqttSecretHashAnnotation  = "pedge.io/mqtt-hash"
-	serviceAnnotation         = "pedge.io/service"
+	deviceSecretSuffix     = "-user-credentials"
+	configBuilderJobSuffix = "-config-build"
 )
 
 // DeviceReconciler reconciles a Device object
@@ -97,12 +90,12 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *DeviceReconciler) reconcile(ctx context.Context, device *pedgev1alpha1.Device) (ctrl.Result, error) {
-	buildHash, err := r.createSecret(ctx, device)
-	if err != nil {
+
+	if err := r.createSecret(ctx, device); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if result, err := r.createJob(ctx, device, buildHash); err != nil {
+	if result, err := r.createJob(ctx, device); err != nil {
 		return ctrl.Result{}, err
 	} else if result != (ctrl.Result{}) {
 		return result, nil
@@ -115,93 +108,52 @@ func (r *DeviceReconciler) reconcile(ctx context.Context, device *pedgev1alpha1.
 	return ctrl.Result{}, nil
 }
 
-func (r *DeviceReconciler) createSecret(ctx context.Context, device *pedgev1alpha1.Device) (string, error) {
+func (r *DeviceReconciler) createSecret(ctx context.Context, device *pedgev1alpha1.Device) error {
 	logger := ctrl.LoggerFrom(ctx)
 	// Secret
 	secretName := device.Name + deviceSecretSuffix
 	var secret corev1.Secret
 
 	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: device.Namespace}, &secret); err != nil {
-		logger.Info("Creating new secret " + secretName)
+		logger.Info("Creating a new secret " + secretName)
 		secret = corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,
 				Namespace: device.Namespace,
-			},
-			Data: map[string][]byte{
-				"username": []byte(device.Name),
-				"password": []byte(generateRandomPassword(16)),
+				Labels: map[string]string{
+					secretTypeLabel: "device",
+					deviceNameLabel: device.Name,
+				},
 			},
 		}
-		// Set the ownerRef for the secret to ensure it gets cleaned up when the device is deleted
+		// ? Set the ownerRef for the secret to ensure it gets cleaned up when the device is deleted
 		// if err := ctrl.SetControllerReference(device, secret, r.Scheme); err != nil {
 		// 	return err
 		// }
 
 		if err := r.Create(ctx, &secret); err != nil {
 			logger.Error(err, "Unable to create secret "+secretName)
-			return "", err
+			return err
 		}
 	} else {
-		changed := false
-		username := string(secret.Data["username"])
-		if string(secret.Data["username"]) != device.Name {
-			logger.Info("Mismatching username in " + secretName + ". Expected " + device.Name + " but found " + username + ". Overriding the value")
-			secret.Data["username"] = []byte(device.Name)
-			changed = true
+		patch := client.MergeFrom(secret.DeepCopy())
+		if secret.Labels == nil {
+			secret.Labels = make(map[string]string)
 		}
-		// flag as changed if the "password" key is missing
-		if _, ok := secret.Data["password"]; !ok {
-			logger.Info("Missing password in " + secretName + ". Generating a new one")
-			secret.Data["password"] = []byte(generateRandomPassword(16))
-			changed = true
-		}
-
-		// TODO use create/patch instead of create/update if changed
-		if changed {
-			if err := r.Update(ctx, &secret); err != nil {
-				logger.Error(err, "Unable to update secret "+secretName)
-				return "", err
-			}
+		secret.Labels[deviceNameLabel] = device.Name
+		secret.Labels[secretTypeLabel] = "device"
+		// patch the secret with the new labels - not using update but patch to avoid conflicts
+		if err := r.Patch(ctx, &secret, patch); err != nil {
+			logger.Error(err, "Unable to patch secret "+secretName)
+			return err
 		}
 	}
-
-	// Create the sha256 build hash
-	// TODO other secrets we may add e.g. devicesCluster, deviceClass, deviceGroup(s), etc
-	hasher := sha256.New()
-	hashutils.DeepHashObject(hasher, device.Spec)
-	// * Create a sha256 hash of all the things that might change the config.bin
-	// * This way, the Job will be triggered when the password changes, but not when the config.bin changes
-	for key, value := range secret.Data {
-		if key != "config.bin" {
-			hasher.Write([]byte(key))
-			hasher.Write(value)
-		}
-	}
-	buildHash := hex.EncodeToString(hasher.Sum(nil))
-
-	if device.Annotations == nil {
-		device.Annotations = make(map[string]string)
-	}
-	mqttHasher := sha256.New()
-	mqttHasher.Write(secret.Data["username"])
-	mqttHasher.Write(secret.Data["password"])
-
-	device.Annotations[mqttSecretHashAnnotation] = hex.EncodeToString(mqttHasher.Sum(nil))
-	device.Annotations[buildConfigHashAnnotation] = buildHash
-
-	// Add the secret name to the device labels
-	if device.Labels == nil {
-		device.Labels = make(map[string]string)
-	}
-	device.Labels[secretNameLabel] = secretName
-
-	return buildHash, nil
+	return nil
 }
 
-func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.Device, buildHash string) (ctrl.Result, error) {
+func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.Device) (ctrl.Result, error) {
 	logger := ctrl.LoggerFrom(ctx)
-	jobName := device.Name + "-config-build"
+	jobName := device.Name + configBuilderJobSuffix
 	existingJob := &batchv1.Job{}
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: device.Namespace}, existingJob)
 	if err == nil {
@@ -216,18 +168,6 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 			logger.Info("Job is not completed yet, requeuing", "job", jobName)
 			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 		}
-		if existingJob.Annotations[buildConfigHashAnnotation] == device.Annotations[buildConfigHashAnnotation] {
-			logger.Info("Existing Job is up-to-date, not requeuing", "job", jobName)
-			return ctrl.Result{}, nil
-		} else {
-			// TODO still not OK, it still triggers multiple times
-
-			// if err := r.Status().Update(ctx, device); err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// ! Probably because the hash is not saved correclty. Put it in the status?
-
-		}
 
 		// Delete the existing Job
 		if err := r.Delete(ctx, existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
@@ -236,7 +176,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 		}
 
 		// Requeue until the job is deleted
-		logger.Info("Existing Job deleted, requeuing for new job creation", "job", jobName, "HASH", existingJob.Annotations[buildConfigHashAnnotation])
+		logger.Info("Existing Job deleted, requeuing for new job creation", "job", jobName)
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	} else {
 		if !apierrors.IsNotFound(err) {
@@ -293,9 +233,6 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 			Labels: map[string]string{
 				"job-name": jobName,
 			},
-			Annotations: map[string]string{
-				buildConfigHashAnnotation: device.Annotations[buildConfigHashAnnotation],
-			},
 		},
 		Spec: batchv1.JobSpec{
 			Selector: &metav1.LabelSelector{
@@ -311,7 +248,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 				},
 				Spec: corev1.PodSpec{
 					// The service account is used to be able to patch the secret. It is defined by the DevicesCluster
-					ServiceAccountName: devicesCluster.Name + "-config-builder",
+					ServiceAccountName: devicesCluster.Name + configBuilderJobSuffix,
 					InitContainers: []corev1.Container{
 						{
 							Name:            "build-config",
@@ -426,10 +363,6 @@ func (r *DeviceReconciler) createRabbitmqResources(ctx context.Context, device *
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
 			},
-			Annotations: map[string]string{
-				// Needed to trigger a reconciliation when the password changes
-				mqttSecretHashAnnotation: device.Annotations[mqttSecretHashAnnotation],
-			},
 		},
 		Spec: rabbitmqtopologyv1.UserSpec{
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
@@ -540,15 +473,8 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.Device{}).
-		// Owns(&batchv1.Job{}).
-		// TODO Watch DevicesCluster, too (the sensors topic name can change)
-		// Watch for changes in the secret of the device
-		Watches(
-			&corev1.Secret{},
-			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
 		// Watch for changes in the class of the device
+		// TODO maybe better to watch for changes in the DevicesCluster
 		Watches(
 			&pedgev1alpha1.DeviceClass{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForDeviceClass),
@@ -561,30 +487,6 @@ func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Complete(r)
-}
-
-func (r *DeviceReconciler) findObjectsForSecret(ctx context.Context, secret client.Object) []reconcile.Request {
-	attachedDevices := &pedgev1alpha1.DeviceList{}
-	listOps := &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set{
-			secretNameLabel: secret.GetName(),
-		}),
-		Namespace: secret.GetNamespace(),
-	}
-	if err := r.List(ctx, attachedDevices, listOps); err != nil {
-		return []reconcile.Request{}
-	}
-
-	requests := make([]reconcile.Request, len(attachedDevices.Items))
-	for i, item := range attachedDevices.Items {
-		requests[i] = reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      item.GetName(),
-				Namespace: item.GetNamespace(),
-			},
-		}
-	}
-	return requests
 }
 
 func (r *DeviceReconciler) findObjectsForDeviceClass(ctx context.Context, deviceClass client.Object) []reconcile.Request {
