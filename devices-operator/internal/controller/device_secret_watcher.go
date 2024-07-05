@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"sort"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -55,12 +55,19 @@ func (r *DeviceSecretWatcherReconciler) Reconcile(ctx context.Context, req ctrl.
 	logger.Info("Secret fetched", "name", secret.Name)
 
 	secretHasher := sha256.New()
-	for key, value := range secret.Data {
+	keys := make([]string, 0, len(secret.Data))
+
+	for k := range secret.Data {
+		keys = append(keys, k)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	for _, key := range keys {
 		if key != "config.bin" {
 			secretHasher.Write([]byte(key))
-			secretHasher.Write(value)
+			secretHasher.Write(secret.Data[key])
 		}
 	}
+
 	secretHash := hex.EncodeToString(secretHasher.Sum(nil))
 
 	mqttHasher := sha256.New()
@@ -70,35 +77,6 @@ func (r *DeviceSecretWatcherReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	backoff := initialBackoff
 	retryCount := 0
-	for retryCount = 0; retryCount < maxRetries; retryCount++ {
-		// Fetch the latest version of the device instance
-		device := &pedgev1alpha1.Device{}
-		if err := r.Get(ctx, types.NamespacedName{Name: deviceName, Namespace: secret.Namespace}, device); err != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
-		}
-
-		// Create a copy of the device to create the patch
-		patch := client.MergeFrom(device.DeepCopy())
-
-		// Update the annotations
-		if device.Annotations == nil {
-			device.Annotations = make(map[string]string)
-		}
-		device.Annotations[deviceSecretHashLabel] = secretHash
-		device.Annotations[mqttDeviceSecretHashLabel] = mqttHash
-
-		// Apply the patch
-		if err := r.Patch(ctx, device, patch); err != nil {
-			if errors.IsConflict(err) {
-				logger.Info("Conflict when updating device, retrying", "name", device.Name)
-				time.Sleep(backoff)
-				backoff *= 2
-				continue
-			}
-			return ctrl.Result{}, err
-		}
-		break
-	}
 
 	if retryCount == maxRetries {
 		logger.Error(nil, "Failed to update device after retries", "name", deviceName)
@@ -137,22 +115,41 @@ func (r *DeviceSecretWatcherReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, errors.NewConflict(secretGR, secret.Name, nil)
 	}
 
-	jobName := deviceName + configBuilderJobSuffix
-	existingJob := &batchv1.Job{}
-	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: secret.Namespace}, existingJob); err != nil {
-
-		// Patch the existing Job
-		patch := client.MergeFrom(existingJob.DeepCopy())
-
-		if existingJob.ObjectMeta.Annotations == nil {
-			existingJob.ObjectMeta.Annotations = make(map[string]string)
+	// We need to possibly update the device in order to sync the RabbitMQ User credentials
+	// TODO check if the device controller updates the user. Or, do it from here and forget about the mqttDeviceSecretHashLabel annotation on the device
+	for retryCount = 0; retryCount < maxRetries; retryCount++ {
+		// Fetch the latest version of the device instance
+		device := &pedgev1alpha1.Device{}
+		if err := r.Get(ctx, types.NamespacedName{Name: deviceName, Namespace: secret.Namespace}, device); err != nil {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-		existingJob.ObjectMeta.Annotations[deviceSecretHashLabel] = secretHash
 
-		if err := r.Patch(ctx, existingJob, patch); err != nil {
+		// Create a copy of the device to create the patch
+		patch := client.MergeFrom(device.DeepCopy())
+
+		// Update the annotations
+		if device.Annotations == nil {
+			device.Annotations = make(map[string]string)
+		}
+
+		if device.Annotations[mqttDeviceSecretHashLabel] == mqttHash && device.Annotations[deviceSecretHashLabel] == secretHash {
+			logger.Info("No change in the secret that need to be reflected in the device", "name", secret.Name)
+			break
+		}
+		device.Annotations[mqttDeviceSecretHashLabel] = mqttHash
+		device.Annotations[deviceSecretHashLabel] = secretHash
+
+		// Apply the patch
+		if err := r.Patch(ctx, device, patch); err != nil {
+			if errors.IsConflict(err) {
+				logger.Info("Conflict when updating device, retrying", "name", device.Name)
+				time.Sleep(backoff)
+				backoff *= 2
+				continue
+			}
 			return ctrl.Result{}, err
 		}
-		logger.Info("Job patched", "job", jobName)
+		break
 	}
 
 	return ctrl.Result{}, nil
