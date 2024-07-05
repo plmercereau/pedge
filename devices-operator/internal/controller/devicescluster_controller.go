@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	listenerUserName = "device-listener"
+	listenerUserName        = "device-listener"
+	secretVersionAnnotation = "pedge.io/secret-version"
 )
 
 // DevicesClusterReconciler reconciles a DevicesCluster object

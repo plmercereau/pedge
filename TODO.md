@@ -1,7 +1,3 @@
-- device config partition/file
-  - config-builder-esp32 docker image
-    - mount secrets as volumes, and generate the csv file, then generate the bin
-      - https://chatgpt.com/share/3e202c7f-90b0-4863-81f1-6f8847e84d86
 - Include the lilygo code into the new esp32 firmware builder
 - DeviceGroup
   - used for loading common settings e.g. wifi settings

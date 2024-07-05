@@ -42,10 +42,12 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("Found device class", "deviceClass", deviceClass.Name)
 	jobName := deviceClass.Name + "-firmware-build"
 	builderImage := deviceClass.Spec.Builder.Image
-
+	firmwareMount := corev1.VolumeMount{
+		Name:      "firmware",
+		MountPath: "/firmware",
+	}
 	desiredJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -72,20 +74,21 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 							Name:            "build-firmware",
 							Image:           fmt.Sprintf("%s:%s", builderImage.Repository, builderImage.Tag),
 							ImagePullPolicy: builderImage.PullPolicy,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "firmware",
-									MountPath: "/firmware",
-								},
-							},
-							Env: deviceClass.Spec.Builder.Env,
+							VolumeMounts:    []corev1.VolumeMount{firmwareMount},
+							Env:             deviceClass.Spec.Builder.Env,
+						},
+						{
+							Name:         "tar-firmware",
+							Image:        "busybox:1.36.1",
+							Command:      []string{"sh", "-c", "tar -czf /firmware/firmware.tgz /firmware/*"},
+							VolumeMounts: []corev1.VolumeMount{firmwareMount},
 						},
 					},
 					Containers: []corev1.Container{
 						{
 							Name:    "upload-firmware",
 							Image:   "amazon/aws-cli:2.16.6",
-							Command: []string{"sh", "-c", fmt.Sprintf("aws --no-verify-ssl s3 cp /firmware/firmware.bin s3://%s/%s.bin", deviceClass.Spec.Storage.Bucket, deviceClass.Name)},
+							Command: []string{"sh", "-c", fmt.Sprintf("aws --no-verify-ssl s3 cp /firmware/firmware.tgz s3://%s/%s.tgz", deviceClass.Spec.Storage.Bucket, deviceClass.Name)},
 							Env: []corev1.EnvVar{
 								{
 									Name:  "AWS_ENDPOINT_URL_S3",
@@ -104,12 +107,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 									ValueFrom: deviceClass.Spec.Storage.SecretKey,
 								},
 							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "firmware",
-									MountPath: "/firmware",
-								},
-							},
+							VolumeMounts: []corev1.VolumeMount{firmwareMount},
 						},
 					},
 					RestartPolicy: corev1.RestartPolicyOnFailure,

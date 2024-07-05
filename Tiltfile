@@ -1,4 +1,3 @@
-
 load('ext://helm_resource', 'helm_resource', 'helm_repo')
 
 helm_repo('traefik', 'https://traefik.github.io/charts', resource_name='traefik-repo')

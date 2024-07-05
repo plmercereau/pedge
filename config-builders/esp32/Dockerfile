@@ -21,6 +21,7 @@ COPY nvs_partition_gen.py csv_gen.py build.sh /app/
 RUN mkdir -p /output /secrets
 
 ENV OUTPUT_FILE=/output/config.bin
+ENV SECRETS_PATH=/secrets
 ENV PARTITION_SIZE=0x6000
 
 # Set the command to run the application

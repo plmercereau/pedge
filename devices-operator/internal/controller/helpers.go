@@ -2,6 +2,8 @@ package controller
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"math/big"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -9,8 +11,8 @@ import (
 
 func generateRandomPassword(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz" +
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		// ! c macro interpolation does not support some characters in !@#$%^&*()-_=+[]{}|;:,.<>?/~"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" +
+		"!@#$%^&*()-_=+[]{}|;:,.<>?/~"
 	password := make([]byte, length)
 	for i := range password {
 		randomIndex, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
@@ -19,13 +21,21 @@ func generateRandomPassword(length int) string {
 	return string(password)
 }
 
+func sha256Checksum(input string) string {
+	hash := sha256.New()
+	hash.Write([]byte(input))
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
 // jobSpecMatches checks if two job specs match
 func jobSpecMatches(existingJob, newJob *batchv1.Job) bool {
 	// Add your comparison logic here, comparing fields in existingJob.Spec and newJob.Spec
 	// Return true if they match, false otherwise
 
 	// For simplicity, we just check labels and some key fields here
+	// TODO check other stuff
 	if !equalMaps(existingJob.Labels, newJob.Labels) ||
+		// (existingJob.Annotations[secretHashAnnotation] != newJob.Annotations[secretHashAnnotation]) ||
 		existingJob.Spec.Template.Spec.RestartPolicy != newJob.Spec.Template.Spec.RestartPolicy ||
 		len(existingJob.Spec.Template.Spec.InitContainers) != len(newJob.Spec.Template.Spec.InitContainers) ||
 		len(existingJob.Spec.Template.Spec.Containers) != len(newJob.Spec.Template.Spec.Containers) {
