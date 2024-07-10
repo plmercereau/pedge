@@ -37,6 +37,12 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
+	devicesCluster := &pedgev1alpha1.DevicesCluster{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name}, devicesCluster); err != nil {
+		logger.Error(err, "Unable to fetch DevicesCluster")
+		return ctrl.Result{}, err
+	}
+
 	jobName := deviceClass.Name + "-firmware-build"
 	builderImage := deviceClass.Spec.Builder.Image
 	firmwareMount := corev1.VolumeMount{
@@ -103,7 +109,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 							Name: storageMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: deviceClass.Spec.DevicesClusterReference.Name + persistentVolumeClaimSuffix,
+									ClaimName: devicesCluster.Spec.PersistentVolumeClaimName,
 								},
 							},
 						},

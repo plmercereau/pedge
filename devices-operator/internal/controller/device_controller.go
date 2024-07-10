@@ -340,7 +340,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 							Name: storageMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: devicesCluster.Name + persistentVolumeClaimSuffix,
+									ClaimName: devicesCluster.Spec.PersistentVolumeClaimName,
 								},
 							},
 						},

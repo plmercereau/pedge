@@ -9,7 +9,6 @@ import (
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,10 +24,8 @@ import (
 )
 
 const (
-	listenerUserName            = "device-listener"
-	secretVersionAnnotation     = "pedge.io/secret-version"
-	persistentVolumeSuffix      = "-pv"
-	persistentVolumeClaimSuffix = "-pvc"
+	listenerUserName        = "device-listener"
+	secretVersionAnnotation = "pedge.io/secret-version"
 )
 
 // DevicesClusterReconciler reconciles a DevicesCluster object
@@ -169,54 +166,6 @@ log.console.level = debug
 				return err
 			}
 		}
-	}
-
-	// Define the desired PersistentVolume resource
-	persistentVolume := &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: server.Name + persistentVolumeSuffix,
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			Capacity: corev1.ResourceList{
-				corev1.ResourceStorage: resource.MustParse("10Gi"),
-			},
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteMany,
-			},
-			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/data",
-				},
-			},
-		},
-	}
-
-	if err := r.CreateOrUpdate(ctx, persistentVolume); err != nil {
-		return err
-	}
-
-	// Define the desired PersistentVolumeClaim resource
-	persistentVolumeClaim := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name + persistentVolumeClaimSuffix,
-			Namespace: server.Namespace,
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
-			},
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("10Gi"),
-				},
-			},
-			// StorageClassName: &server.Spec.storageClassName, // TODO use an appropriate storage class
-		},
-	}
-
-	if err := r.CreateOrUpdate(ctx, persistentVolumeClaim); err != nil {
-		return err
 	}
 
 	// Store MQTT URL/TOPIC/USERNAME/PASSWORD in influxdb-auth in the influxdb namespace

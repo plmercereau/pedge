@@ -23,6 +23,8 @@ type InfluxDB struct {
 // DevicesClusterSpec defines the desired state of DevicesCluster
 type DevicesClusterSpec struct {
 	// +kubebuilder:validation:Required
+	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
+	// +kubebuilder:validation:Required
 	MQTT MQTTSpec `json:"mqtt"`
 	// +kubebuilder:validation:Optional
 	InfluxDB InfluxDB `json:"influxdb"`

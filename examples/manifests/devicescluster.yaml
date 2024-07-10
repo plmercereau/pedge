@@ -3,6 +3,7 @@ kind: DevicesCluster
 metadata:
   name: my-cluster
 spec:
+  persistentVolumeClaimName: devices
   mqtt:
     sensorsTopic: sensors
   influxdb:
