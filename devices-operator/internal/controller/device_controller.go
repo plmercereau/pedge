@@ -186,18 +186,15 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 	}
 
 	// Fetch the referenced DeviceClass instance
-	var deviceClass *pedgev1alpha1.DeviceClass
-	if device.Spec.DeviceClassReference != (pedgev1alpha1.DeviceClassReference{}) {
-		deviceClass = &pedgev1alpha1.DeviceClass{}
-		if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClassReference.Name, Namespace: device.Namespace}, deviceClass); err != nil {
-			logger.Error(err, "unable to fetch deviceClass")
-			return ctrl.Result{}, err
-		}
+	var deviceClass pedgev1alpha1.DeviceClass
+	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClassReference.Name, Namespace: device.Namespace}, &deviceClass); err != nil {
+		logger.Error(err, "unable to fetch Device Class")
+		return ctrl.Result{}, err
 	}
 
-	devicesCluster := &pedgev1alpha1.DevicesCluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
-		logger.Error(err, "unable to fetch DevicesCluster")
+	var devicesCluster pedgev1alpha1.DevicesCluster
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name, Namespace: deviceClass.Namespace}, &devicesCluster); err != nil {
+		logger.Error(err, "unable to fetch Devices Cluster")
 		return ctrl.Result{}, err
 	}
 

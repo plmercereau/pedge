@@ -38,8 +38,8 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	devicesCluster := &pedgev1alpha1.DevicesCluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name}, devicesCluster); err != nil {
-		logger.Error(err, "Unable to fetch DevicesCluster")
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name, Namespace: deviceClass.Namespace}, devicesCluster); err != nil {
+		logger.Error(err, "Unable to fetch Devices Cluster")
 		return ctrl.Result{}, err
 	}
 

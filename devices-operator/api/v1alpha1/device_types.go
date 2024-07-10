@@ -11,7 +11,7 @@ type DeviceClassReference struct {
 
 // DeviceSpec defines the desired state of Device
 type DeviceSpec struct {
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Required
 	DeviceClassReference DeviceClassReference `json:"deviceClassReference,omitempty"`
 }
 
