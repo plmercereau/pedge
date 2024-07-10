@@ -29,7 +29,6 @@
 - k8s events in controllers
 - move netboot stuff to another repo
 - dedicated influxdb user for grafana
-- dedicated minio user
 - create service accounts
   - only allowed to create/manage a device cluster
   - only allowed to manage devices

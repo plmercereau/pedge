@@ -3,7 +3,5 @@ kind: Device
 metadata:
   name: esp32cam
 spec:
-  devicesClusterReference:
-    name: my-cluster
   deviceClassReference:
     name: esp32cam

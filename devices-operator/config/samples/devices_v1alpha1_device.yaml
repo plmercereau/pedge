@@ -3,7 +3,5 @@ kind: Device
 metadata:
   name: device-sample
 spec:
-  devicesClusterReference:
-    name: devices-cluster
   deviceClassReference:
     name: deviceclass-sample

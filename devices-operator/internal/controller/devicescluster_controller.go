@@ -8,8 +8,8 @@ import (
 	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,8 +25,10 @@ import (
 )
 
 const (
-	listenerUserName        = "device-listener"
-	secretVersionAnnotation = "pedge.io/secret-version"
+	listenerUserName            = "device-listener"
+	secretVersionAnnotation     = "pedge.io/secret-version"
+	persistentVolumeSuffix      = "-pv"
+	persistentVolumeClaimSuffix = "-pvc"
 )
 
 // DevicesClusterReconciler reconciles a DevicesCluster object
@@ -40,8 +42,7 @@ type DevicesClusterReconciler struct {
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=core,resources=secrets;serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rabbitmq.com,resources=rabbitmqclusters;vhosts;queues;permissions;topicpermissions;users,verbs=get;list;watch;create;update;patch;delete
-// TODO allow to crud roles, role bindinfs, and service accounts
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims;persistentvolumes,verbs=get;list;watch;create;update;patch;delete
 
 func (r *DevicesClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -170,52 +171,51 @@ log.console.level = debug
 		}
 	}
 
-	// Create a service account to use in the configuration build job so it can patch the device secret
-	serviceAccount := &corev1.ServiceAccount{
+	// Define the desired PersistentVolume resource
+	persistentVolume := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name + configBuilderJobSuffix,
-			Namespace: server.Namespace,
+			Name: server.Name + persistentVolumeSuffix,
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("10Gi"),
+			},
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteMany,
+			},
+			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/data",
+				},
+			},
 		},
 	}
-	if err := controllerutil.SetOwnerReference(server, serviceAccount, r.Scheme); err != nil {
-		return err
 
-	}
-	role := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name + "-config-builder",
-			Namespace: server.Namespace,
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"secrets"},
-				Verbs:     []string{"get", "patch"},
-			},
-		},
-	}
-	if err := controllerutil.SetOwnerReference(server, role, r.Scheme); err != nil {
+	if err := r.CreateOrUpdate(ctx, persistentVolume); err != nil {
 		return err
 	}
-	roleBinding := &rbacv1.RoleBinding{
+
+	// Define the desired PersistentVolumeClaim resource
+	persistentVolumeClaim := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name + "-config-builder",
+			Name:      server.Name + persistentVolumeClaimSuffix,
 			Namespace: server.Namespace,
 		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      serviceAccount.Name,
-				Namespace: serviceAccount.Namespace,
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Kind:     "Role",
-			Name:     role.Name,
-			APIGroup: "rbac.authorization.k8s.io",
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("10Gi"),
+				},
+			},
+			// StorageClassName: &server.Spec.storageClassName, // TODO use an appropriate storage class
 		},
 	}
-	if err := controllerutil.SetOwnerReference(server, roleBinding, r.Scheme); err != nil {
+
+	if err := r.CreateOrUpdate(ctx, persistentVolumeClaim); err != nil {
 		return err
 	}
 
@@ -340,7 +340,7 @@ log.console.level = debug
 	}
 	// controllerutil.SetOwnerReference(server, listenerTopicPermission, r.Scheme)
 
-	resources := []client.Object{cluster, listenerUser, listenerPermission, listenerTopicPermission, role, serviceAccount, roleBinding}
+	resources := []client.Object{cluster, listenerUser, listenerPermission, listenerTopicPermission}
 	for _, res := range resources {
 		if err := r.CreateOrUpdate(ctx, res); err != nil {
 			return err

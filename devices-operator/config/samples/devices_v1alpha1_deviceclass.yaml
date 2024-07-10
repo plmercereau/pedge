@@ -3,8 +3,15 @@ kind: DeviceClass
 metadata:
   name: deviceclass-sample
 spec:
+  devicesClusterReference:
+    name: devices-cluster
   builder:
     image:
       repository: ghcr.io/plmercereau/pedge/firmware-builder-esp32
+      tag: latest
+      pullPolicy: Always
+  config:
+    image:
+      repository: ghcr.io/plmercereau/pedge/config-builder-esp32
       tag: latest
       pullPolicy: Always

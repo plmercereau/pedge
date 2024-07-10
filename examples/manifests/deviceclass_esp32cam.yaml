@@ -3,6 +3,8 @@ kind: DeviceClass
 metadata:
   name: esp32cam
 spec:
+  devicesClusterReference:
+    name: my-cluster
   builder:
     image:
       repository: ghcr.io/plmercereau/pedge/firmware-builder-esp32
@@ -16,14 +18,3 @@ spec:
       repository: ghcr.io/plmercereau/pedge/config-builder-esp32
       tag: latest
       pullPolicy: IfNotPresent
-  storage:
-    endpoint: https://minio.default.svc
-    bucket: firmwares
-    accessKey:
-      secretKeyRef:
-        name: storage-user
-        key: CONSOLE_ACCESS_KEY
-    secretKey:
-      secretKeyRef:
-        name: storage-user
-        key: CONSOLE_SECRET_KEY

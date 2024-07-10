@@ -2,8 +2,6 @@ package controller
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"math/big"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -19,12 +17,6 @@ func generateRandomPassword(length int) string {
 		password[i] = charset[randomIndex.Int64()]
 	}
 	return string(password)
-}
-
-func sha256Checksum(input string) string {
-	hash := sha256.New()
-	hash.Write([]byte(input))
-	return hex.EncodeToString(hash.Sum(nil))
 }
 
 // jobSpecMatches checks if two job specs match

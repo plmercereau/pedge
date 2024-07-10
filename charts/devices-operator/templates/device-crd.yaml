@@ -40,13 +40,6 @@ spec:
                   name:
                     type: string
                 type: object
-              devicesClusterReference:
-                properties:
-                  name:
-                    type: string
-                type: object
-            required:
-            - devicesClusterReference
             type: object
           status:
             description: DeviceStatus defines the observed state of Device

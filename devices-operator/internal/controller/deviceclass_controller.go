@@ -32,12 +32,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Fetch the DeviceClass instance
 	deviceClass := &pedgev1alpha1.DeviceClass{}
-	err := r.Get(ctx, req.NamespacedName, deviceClass)
-
-	if err != nil {
-		if client.IgnoreNotFound(err) == nil {
-			return ctrl.Result{}, nil
-		}
+	if err := r.Get(ctx, req.NamespacedName, deviceClass); err != nil {
 		logger.Error(err, "Unable to fetch DeviceClass")
 		return ctrl.Result{}, err
 	}
@@ -47,6 +42,11 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	firmwareMount := corev1.VolumeMount{
 		Name:      "firmware",
 		MountPath: "/firmware",
+	}
+	storageMount := corev1.VolumeMount{
+		Name:      "data",
+		MountPath: "/data",
+		SubPath:   "firmwares",
 	}
 	desiredJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -77,45 +77,34 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 							VolumeMounts:    []corev1.VolumeMount{firmwareMount},
 							Env:             deviceClass.Spec.Builder.Env,
 						},
-						{
-							Name:         "tar-firmware",
-							Image:        "busybox:1.36.1",
-							Command:      []string{"sh", "-c", "tar -czf /firmware/firmware.tgz /firmware/*"},
-							VolumeMounts: []corev1.VolumeMount{firmwareMount},
-						},
 					},
 					Containers: []corev1.Container{
 						{
-							Name:    "upload-firmware",
-							Image:   "amazon/aws-cli:2.16.6",
-							Command: []string{"sh", "-c", fmt.Sprintf("aws --no-verify-ssl s3 cp /firmware/firmware.tgz s3://%s/%s.tgz", deviceClass.Spec.Storage.Bucket, deviceClass.Name)},
-							Env: []corev1.EnvVar{
-								{
-									Name:  "AWS_ENDPOINT_URL_S3",
-									Value: deviceClass.Spec.Storage.Endpoint,
-								},
-								// {
-								// 	Name:  "AWS_DEFAULT_REGION",
-								// 	Value: bucketRegion,
-								// },
-								{
-									Name:      "AWS_ACCESS_KEY_ID",
-									ValueFrom: deviceClass.Spec.Storage.AccessKey,
-								},
-								{
-									Name:      "AWS_SECRET_ACCESS_KEY",
-									ValueFrom: deviceClass.Spec.Storage.SecretKey,
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{firmwareMount},
+							Name:  "upload-firmware",
+							Image: "busybox:1.36.1",
+							Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p %s/%s; tar -czf %s/%s/firmware.tgz %s/*",
+								storageMount.MountPath,
+								deviceClass.Name,
+								storageMount.MountPath,
+								deviceClass.Name,
+								firmwareMount.MountPath)},
+							VolumeMounts: []corev1.VolumeMount{firmwareMount, storageMount},
 						},
 					},
 					RestartPolicy: corev1.RestartPolicyOnFailure,
 					Volumes: []corev1.Volume{
 						{
-							Name: "firmware",
+							Name: firmwareMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: storageMount.Name,
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: deviceClass.Spec.DevicesClusterReference.Name + persistentVolumeClaimSuffix,
+								},
 							},
 						},
 					},
@@ -132,8 +121,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Check if the Job already exists
 	existingJob := &batchv1.Job{}
-	err = r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: deviceClass.Namespace}, existingJob)
-	if err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: deviceClass.Namespace}, existingJob); err != nil {
 		if errors.IsNotFound(err) {
 			// Create the Job if it does not exist
 			logger.Info("Creating new Job ", "job", jobName)

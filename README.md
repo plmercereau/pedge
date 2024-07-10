@@ -22,8 +22,6 @@ helm install influxdb-grafana oci://ghcr.io/plmercereau/pedge-charts/influxdb-gr
     --set=grafana.ingress.ingressClassName=traefik
 ```
 
-### Set an s3 bucket
-
 
 ### Install the Devices operator
 

@@ -185,20 +185,20 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 		}
 	}
 
-	devicesCluster := &pedgev1alpha1.DevicesCluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
-		logger.Error(err, "unable to fetch DevicesCluster")
-		return ctrl.Result{}, err
-	}
-
 	// Fetch the referenced DeviceClass instance
 	var deviceClass *pedgev1alpha1.DeviceClass
-	if device.Spec.DeviceClasseReference != (pedgev1alpha1.DeviceClassReference{}) {
+	if device.Spec.DeviceClassReference != (pedgev1alpha1.DeviceClassReference{}) {
 		deviceClass = &pedgev1alpha1.DeviceClass{}
-		if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClasseReference.Name, Namespace: device.Namespace}, deviceClass); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClassReference.Name, Namespace: device.Namespace}, deviceClass); err != nil {
 			logger.Error(err, "unable to fetch deviceClass")
 			return ctrl.Result{}, err
 		}
+	}
+
+	devicesCluster := &pedgev1alpha1.DevicesCluster{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
+		logger.Error(err, "unable to fetch DevicesCluster")
+		return ctrl.Result{}, err
 	}
 
 	// TODO use possible custom broker/port values in the DevicesCluster spec instead of the service
@@ -225,6 +225,19 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 	mqttPort := fmt.Sprint(mqttPortInt)
 
 	configBuilderImage := deviceClass.Spec.Config.Image
+	outputMount := corev1.VolumeMount{
+		Name:      "output",
+		MountPath: "/output",
+	}
+	secretsMount := corev1.VolumeMount{
+		Name:      "secrets",
+		MountPath: "/secrets",
+	}
+	storageMount := corev1.VolumeMount{
+		Name:      "data",
+		MountPath: "/data",
+		SubPath:   "configurations",
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -247,22 +260,14 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 					},
 				},
 				Spec: corev1.PodSpec{
-					// The service account is used to be able to patch the secret. It is defined by the DevicesCluster
-					ServiceAccountName: devicesCluster.Name + configBuilderJobSuffix,
 					InitContainers: []corev1.Container{
 						{
 							Name:            "build-config",
 							Image:           fmt.Sprintf("%s:%s", configBuilderImage.Repository, configBuilderImage.Tag),
 							ImagePullPolicy: configBuilderImage.PullPolicy,
 							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "secrets",
-									MountPath: "/secrets",
-								},
-								{
-									Name:      "output",
-									MountPath: "/output",
-								},
+								secretsMount,
+								outputMount,
 							},
 							Env: []corev1.EnvVar{
 								{
@@ -292,30 +297,32 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 									Name:  "SENSORS_TOPIC",
 									Value: devicesCluster.Spec.MQTT.SensorsTopic,
 								},
-								{
-									Name:      "AWS_SECRET_ACCESS_KEY",
-									ValueFrom: deviceClass.Spec.Storage.SecretKey,
-								},
 							},
 						},
 					},
 					Containers: []corev1.Container{
+						// Use a persistent volume to store the firmware
+						// TODO add an .htpasswd file to secure the access to the file
 						{
-							Name:    "update-secret",
-							Image:   "bitnami/kubectl:1.30.2",
-							Command: []string{"sh", "-c", fmt.Sprintf(`kubectl patch secret %s -n %s --type merge -p '{"data":{"config.bin":"'$(base64 -w0 /output/config.bin)'"}}'`, device.Name+deviceSecretSuffix, device.Namespace)},
+							Name:  "upload-secret",
+							Image: "busybox:1.36.1",
+							Command: []string{"sh", "-c", fmt.Sprintf(`mkdir -p %s/%s; cp %s/config.bin %s/%s/config.bin`,
+								storageMount.MountPath,
+								device.Name,
+								outputMount.MountPath,
+								storageMount.MountPath,
+								device.Name,
+							)},
 							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "output",
-									MountPath: "/output",
-								},
+								outputMount,
+								storageMount,
 							},
 						},
 					},
 					RestartPolicy: corev1.RestartPolicyOnFailure,
 					Volumes: []corev1.Volume{
 						{
-							Name: "secrets",
+							Name: secretsMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									SecretName: device.Name + deviceSecretSuffix,
@@ -324,9 +331,17 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 							},
 						},
 						{
-							Name: "output",
+							Name: outputMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: storageMount.Name,
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: devicesCluster.Name + persistentVolumeClaimSuffix,
+								},
 							},
 						},
 					},
@@ -350,8 +365,14 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 
 func (r *DeviceReconciler) createRabbitmqResources(ctx context.Context, device *pedgev1alpha1.Device) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	deviceClass := &pedgev1alpha1.DeviceClass{}
+	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClassReference.Name, Namespace: device.Namespace}, deviceClass); err != nil {
+		logger.Error(err, "unable to fetch deviceClass")
+		return ctrl.Result{}, err
+	}
+
 	devicesCluster := &pedgev1alpha1.DevicesCluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
 		logger.Error(err, "unable to fetch DevicesCluster")
 		return ctrl.Result{}, err
 	}

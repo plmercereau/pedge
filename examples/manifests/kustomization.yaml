@@ -2,7 +2,6 @@ resources:
   - devicescluster.yaml
   - deviceclass_esp32cam.yaml
   - device_esp32cam.yaml
-  - minio_tenant.yaml
   - esp32cam-user-credentials.yaml
 secretGenerator:
   - name: esp32cam-user-credentials

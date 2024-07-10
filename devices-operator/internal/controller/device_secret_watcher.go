@@ -62,10 +62,8 @@ func (r *DeviceSecretWatcherReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
 	for _, key := range keys {
-		if key != "config.bin" {
-			secretHasher.Write([]byte(key))
-			secretHasher.Write(secret.Data[key])
-		}
+		secretHasher.Write([]byte(key))
+		secretHasher.Write(secret.Data[key])
 	}
 
 	secretHash := hex.EncodeToString(secretHasher.Sum(nil))

@@ -27,21 +27,19 @@ type ConfigBuilder struct {
 	Image FirmwareBuilderImage `json:"image,omitempty"`
 }
 
-type Storage struct {
-	Endpoint  string             `json:"endpoint,omitempty"`
-	Bucket    string             `json:"bucket,omitempty"`
-	AccessKey *core.EnvVarSource `json:"accessKey,omitempty"`
-	SecretKey *core.EnvVarSource `json:"secretKey,omitempty"`
+type DevicesClusterReference struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name,omitempty"`
 }
 
 // DeviceClassSpec defines the desired state of DeviceClass
 type DeviceClassSpec struct {
 	// +kubebuilder:validation:Required
+	DevicesClusterReference DevicesClusterReference `json:"devicesClusterReference"`
+	// +kubebuilder:validation:Required
 	Builder FirmwareBuilder `json:"builder,omitempty"`
 	// +kubebuilder:validation:Required
 	Config ConfigBuilder `json:"config,omitempty"`
-	// +kubebuilder:validation:Required
-	Storage Storage `json:"storage,omitempty"`
 }
 
 // DeviceClassStatus defines the observed state of DeviceClass

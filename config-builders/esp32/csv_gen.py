@@ -22,7 +22,7 @@ with open(os.getenv('TMP_CSV_FILE'), 'w', newline='') as csvfile:
     
     secretsPath = os.getenv('SECRETS_PATH', '/secrets')
     settings = {}
-    reserved_keys = ['config.bin', 'username', 'password']
+    reserved_keys = [ 'username', 'password']
     if os.path.exists(secretsPath):
         for file in os.listdir(secretsPath):
             # add to the settings if file is a file and its name is not in reserved_keys
