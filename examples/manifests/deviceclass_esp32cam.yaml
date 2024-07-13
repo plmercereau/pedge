@@ -3,11 +3,11 @@ kind: DeviceClass
 metadata:
   name: esp32cam
 spec:
-  devicesClusterReference:
+  deviceClusterReference:
     name: my-cluster
   builder:
     image:
-      repository: ghcr.io/plmercereau/pedge/firmware-builder-esp32
+      repository: ghcr.io/plmercereau/pedge/esp32-firmware-builder
       tag: latest
       pullPolicy: IfNotPresent
     env:
@@ -15,6 +15,6 @@ spec:
         value: esp32cam
   config:
     image:
-      repository: ghcr.io/plmercereau/pedge/config-builder-esp32
+      repository: ghcr.io/plmercereau/pedge/esp32-config-builder
       tag: latest
       pullPolicy: IfNotPresent

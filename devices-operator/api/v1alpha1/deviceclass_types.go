@@ -27,7 +27,7 @@ type ConfigBuilder struct {
 	Image FirmwareBuilderImage `json:"image,omitempty"`
 }
 
-type DevicesClusterReference struct {
+type DeviceClusterReference struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name,omitempty"`
 }
@@ -35,7 +35,7 @@ type DevicesClusterReference struct {
 // DeviceClassSpec defines the desired state of DeviceClass
 type DeviceClassSpec struct {
 	// +kubebuilder:validation:Required
-	DevicesClusterReference DevicesClusterReference `json:"devicesClusterReference"`
+	DeviceClusterReference DeviceClusterReference `json:"deviceClusterReference"`
 	// +kubebuilder:validation:Required
 	Builder FirmwareBuilder `json:"builder,omitempty"`
 	// +kubebuilder:validation:Required

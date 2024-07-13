@@ -37,8 +37,8 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	devicesCluster := &pedgev1alpha1.DevicesCluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name, Namespace: deviceClass.Namespace}, devicesCluster); err != nil {
+	deviceCluster := &pedgev1alpha1.DeviceCluster{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DeviceClusterReference.Name, Namespace: deviceClass.Namespace}, deviceCluster); err != nil {
 		logger.Error(err, "Unable to fetch Devices Cluster")
 		return ctrl.Result{}, err
 	}
@@ -109,7 +109,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 							Name: storageMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: devicesCluster.Spec.PersistentVolumeClaimName,
+									ClaimName: deviceCluster.Spec.PersistentVolumeClaimName,
 								},
 							},
 						},

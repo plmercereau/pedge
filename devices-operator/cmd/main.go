@@ -134,11 +134,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.DevicesClusterReconciler{
+	if err = (&controller.DeviceClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DevicesCluster")
+		setupLog.Error(err, "unable to create controller", "controller", "DeviceCluster")
 		os.Exit(1)
 	}
 

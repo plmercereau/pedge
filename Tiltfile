@@ -59,7 +59,7 @@ local_resource(
     URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
     HOST=$(echo $URL | awk -F[/:] '{print $4}')
     PORT=$(echo $URL | awk -F[/:] '{print $5}')
-    kubectl patch DevicesCluster my-cluster --type='json' -p="[{'op': 'replace', 'path': '/spec/mqtt/hostname', 'value': '$HOST'},{'op': 'replace', 'path': '/spec/mqtt/port', 'value': $PORT}]"
+    kubectl patch DeviceCluster my-cluster --type='json' -p="[{'op': 'replace', 'path': '/spec/mqtt/hostname', 'value': '$HOST'},{'op': 'replace', 'path': '/spec/mqtt/port', 'value': $PORT}]"
     """,
     resource_deps=['ngrok', 'my-cluster']
 )

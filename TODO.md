@@ -1,7 +1,5 @@
-- forget about caddy and use flask
-- include caddy in the operator
+- include the devices server in the operator
 - include pvc/pv in the operator
-- improve config/caddy security with htpasswd
 - Include the lilygo code into the new esp32 firmware builder
 - rebuild devices configs when the hostname/port/sensor topic changes
 - DeviceGroup
@@ -11,14 +9,7 @@
       - device > device group > device class > devices cluster
       - think of another label to sort device groups e.g. `priority`
   - `spec.secret.name`
-- validation/default hooks
-- flash scripts per device class
-  - flash firmware + bootloader + partitions
-  - fetch config from Kubernetes
-  - flash config (nvs)
-  - where to store the script? Inside the deviceClass artefact? Into a device artefact? ???
-- device sensors
-  - should we determine sensors when building the firmware, or in the config partition/file?
+- rename DeviceCluster to DeviceCluster (singular)
 - develop a rancher UI interface
 
   - CRUD devices
@@ -29,6 +20,10 @@
 
 ## Backlog
 
+- find a better name for 'firmware-http'
+- validation/default hooks
+- device sensors
+  - should we determine sensors when building the firmware, or in the config partition/file?
 - maybe usefull to create a `Storage` CRD to avoid config duplication?
   - `deviceClass.spec.storageReference`
 - k8s events in controllers

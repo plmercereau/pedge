@@ -28,30 +28,30 @@ const (
 	secretVersionAnnotation = "pedge.io/secret-version"
 )
 
-// DevicesClusterReconciler reconciles a DevicesCluster object
-type DevicesClusterReconciler struct {
+// DeviceClusterReconciler reconciles a DeviceCluster object
+type DeviceClusterReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=devicesclusters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=devices.pedge.io,resources=devicesclusters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=devices.pedge.io,resources=deviceclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=core,resources=secrets;serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rabbitmq.com,resources=rabbitmqclusters;vhosts;queues;permissions;topicpermissions;users,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims;persistentvolumes,verbs=get;list;watch;create;update;patch;delete
 
-func (r *DevicesClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	// TODO rename 'server' to 'devicesCluster'
-	// Fetch the DevicesCluster instance
-	server := &pedgev1alpha1.DevicesCluster{}
+	// TODO rename 'server' to 'deviceCluster'
+	// Fetch the DeviceCluster instance
+	server := &pedgev1alpha1.DeviceCluster{}
 	err := r.Get(ctx, req.NamespacedName, server)
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "unable to fetch DevicesCluster. ")
+		logger.Error(err, "unable to fetch DeviceCluster. ")
 		return ctrl.Result{}, err
 	}
 
@@ -64,7 +64,7 @@ func (r *DevicesClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 // syncResources creates or updates the associated resources
-func (r *DevicesClusterReconciler) syncResources(ctx context.Context, server *pedgev1alpha1.DevicesCluster) error {
+func (r *DeviceClusterReconciler) syncResources(ctx context.Context, server *pedgev1alpha1.DeviceCluster) error {
 	// Define the desired RabbitMQ Cluster resource
 	cluster := &rabbitmqv1.RabbitmqCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -299,7 +299,7 @@ log.console.level = debug
 }
 
 // creates or updates a resource
-func (r *DevicesClusterReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
+func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
 	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 	existing := obj.DeepCopyObject().(client.Object)
 	err := r.Get(ctx, key, existing)
@@ -329,9 +329,9 @@ func (r *DevicesClusterReconciler) CreateOrUpdate(ctx context.Context, obj clien
 }
 
 // SetupWithManager sets up the controller with the Manager
-func (r *DevicesClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DeviceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&pedgev1alpha1.DevicesCluster{}).
+		For(&pedgev1alpha1.DeviceCluster{}).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForInfluxSecret),
@@ -340,7 +340,7 @@ func (r *DevicesClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *DevicesClusterReconciler) findObjectsForInfluxSecret(ctx context.Context, secret client.Object) []reconcile.Request {
+func (r *DeviceClusterReconciler) findObjectsForInfluxSecret(ctx context.Context, secret client.Object) []reconcile.Request {
 	attachedDevices := &pedgev1alpha1.DeviceClassList{}
 	listOps := &client.ListOptions{
 		FieldSelector: fields.AndSelectors(

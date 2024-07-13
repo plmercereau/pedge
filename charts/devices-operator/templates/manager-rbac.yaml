@@ -99,6 +99,26 @@ rules:
 - apiGroups:
   - devices.pedge.io
   resources:
+  - deviceclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - deviceclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - devices.pedge.io
+  resources:
   - devices
   verbs:
   - create
@@ -112,26 +132,6 @@ rules:
   - devices.pedge.io
   resources:
   - devices/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - devicesclusters
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - devicesclusters/status
   verbs:
   - get
   - patch

@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
-  name: devicesclusters.devices.pedge.io
+  name: deviceclusters.devices.pedge.io
 spec:
   group: devices.pedge.io
   names:
-    kind: DevicesCluster
-    listKind: DevicesClusterList
-    plural: devicesclusters
-    singular: devicescluster
+    kind: DeviceCluster
+    listKind: DeviceClusterList
+    plural: deviceclusters
+    singular: devicecluster
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: DevicesCluster is the Schema for the devicesclusters API
+        description: DeviceCluster is the Schema for the deviceclusters API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -32,7 +32,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: DevicesClusterSpec defines the desired state of DevicesCluster
+            description: DeviceClusterSpec defines the desired state of DeviceCluster
             properties:
               influxdb:
                 properties:
@@ -71,7 +71,7 @@ spec:
             - mqtt
             type: object
           status:
-            description: DevicesClusterStatus defines the observed state of DevicesCluster
+            description: DeviceClusterStatus defines the observed state of DeviceCluster
             type: object
         type: object
     served: true

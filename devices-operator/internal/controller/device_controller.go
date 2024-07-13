@@ -193,22 +193,22 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 		return ctrl.Result{}, err
 	}
 
-	var devicesCluster pedgev1alpha1.DevicesCluster
-	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name, Namespace: deviceClass.Namespace}, &devicesCluster); err != nil {
+	var deviceCluster pedgev1alpha1.DeviceCluster
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DeviceClusterReference.Name, Namespace: deviceClass.Namespace}, &deviceCluster); err != nil {
 		logger.Error(err, "unable to fetch Devices Cluster")
 		return ctrl.Result{}, err
 	}
 
-	// TODO use possible custom broker/port values in the DevicesCluster spec instead of the service
+	// TODO use possible custom broker/port values in the DeviceCluster spec instead of the service
 	service := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: devicesCluster.Name, Namespace: devicesCluster.Namespace}, service); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceCluster.Name, Namespace: deviceCluster.Namespace}, service); err != nil {
 		logger.Error(err, "unable to fetch service")
 		return ctrl.Result{}, err
 	}
 
 	var mqttBroker string
-	if devicesCluster.Spec.MQTT.Hostname != "" {
-		mqttBroker = devicesCluster.Spec.MQTT.Hostname
+	if deviceCluster.Spec.MQTT.Hostname != "" {
+		mqttBroker = deviceCluster.Spec.MQTT.Hostname
 	} else {
 		serviceIngress := service.Status.LoadBalancer.Ingress[0]
 		if serviceIngress.Hostname != "" {
@@ -223,8 +223,8 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 	}
 
 	mqttPortInt := 1883
-	if devicesCluster.Spec.MQTT.Port != 0 {
-		mqttPortInt = int(devicesCluster.Spec.MQTT.Port)
+	if deviceCluster.Spec.MQTT.Port != 0 {
+		mqttPortInt = int(deviceCluster.Spec.MQTT.Port)
 	} else {
 		for _, port := range service.Spec.Ports {
 			if port.Name == "mqtt" {
@@ -306,7 +306,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 								},
 								{
 									Name:  "MQTT_SENSORS_TOPIC",
-									Value: devicesCluster.Spec.MQTT.SensorsTopic,
+									Value: deviceCluster.Spec.MQTT.SensorsTopic,
 								},
 							},
 						},
@@ -374,7 +374,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 							Name: storageMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: devicesCluster.Spec.PersistentVolumeClaimName,
+									ClaimName: deviceCluster.Spec.PersistentVolumeClaimName,
 								},
 							},
 						},
@@ -405,9 +405,9 @@ func (r *DeviceReconciler) createRabbitmqResources(ctx context.Context, device *
 		return ctrl.Result{}, err
 	}
 
-	devicesCluster := &pedgev1alpha1.DevicesCluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
-		logger.Error(err, "unable to fetch DevicesCluster")
+	deviceCluster := &pedgev1alpha1.DeviceCluster{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DeviceClusterReference.Name, Namespace: device.Namespace}, deviceCluster); err != nil {
+		logger.Error(err, "unable to fetch DeviceCluster")
 		return ctrl.Result{}, err
 	}
 	// Define the desired RabbitMQ User resource
@@ -421,7 +421,7 @@ func (r *DeviceReconciler) createRabbitmqResources(ctx context.Context, device *
 		},
 		Spec: rabbitmqtopologyv1.UserSpec{
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name: devicesCluster.Name,
+				Name: deviceCluster.Name,
 			},
 			ImportCredentialsSecret: &corev1.LocalObjectReference{
 				Name: device.Name + deviceSecretSuffix,
@@ -450,8 +450,8 @@ func (r *DeviceReconciler) createRabbitmqResources(ctx context.Context, device *
 				Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      devicesCluster.Name,
-				Namespace: devicesCluster.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
@@ -473,13 +473,13 @@ func (r *DeviceReconciler) createRabbitmqResources(ctx context.Context, device *
 			},
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
-				Write:    fmt.Sprintf("^%s\\.%s\\..+$", devicesCluster.Spec.MQTT.SensorsTopic, device.Name),
+				Write:    fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic, device.Name),
 				// TODO narrow down the read permissions: the device should only be able to write to its own topic
-				Read: fmt.Sprintf("^%s\\.%s\\..+$", devicesCluster.Spec.MQTT.SensorsTopic, device.Name),
+				Read: fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic, device.Name),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      devicesCluster.Name,
-				Namespace: devicesCluster.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
@@ -529,7 +529,7 @@ func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.Device{}).
 		// Watch for changes in the class of the device
-		// TODO maybe better to watch for changes in the DevicesCluster
+		// TODO maybe better to watch for changes in the DeviceCluster
 		Watches(
 			&pedgev1alpha1.DeviceClass{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForDeviceClass),
