@@ -1,5 +1,6 @@
 #include "mqtt_helper.h"
 
+#include <Preferences.h>
 #include <WiFi.h>
 
 WiFiClient espClient;
@@ -8,17 +9,17 @@ PubSubClient mqttClient(espClient);
 boolean mqttConnect() {
   Preferences preferences;
   preferences.begin(MQTT_NAMESPACE, false);
-  String username = preferences.getString(MQTT_USERNAME, "");
+  String deviceName = preferences.getString(MQTT_USERNAME, "");
   String password = preferences.getString(MQTT_PASSWORD, "");
   preferences.end();
   // TODO check if all values are present
 
   // TODO make it non-esp32 specific
-  const String clientId = String(username) + "-" + getESP32ChipID();
+  const String clientId = String(deviceName) + "-" + getESP32ChipID();
 
   // Connect to MQTT Broker
-  boolean status =
-      mqttClient.connect(clientId.c_str(), username.c_str(), password.c_str());
+  boolean status = mqttClient.connect(clientId.c_str(), deviceName.c_str(),
+                                      password.c_str());
 
   Serial.print("connection ");
   if (status == false) {
@@ -43,8 +44,19 @@ void setupMqtt(MQTT_CALLBACK_SIGNATURE) {
   IPAddress ip = IPAddress();
   if (ip.fromString(broker)) {
     mqttClient.setServer(ip, port);
+    Serial.print("MQTT server set to IP address");
+    Serial.print(ip);
+    Serial.print(":");
+    Serial.println(port);
   } else {
-    mqttClient.setServer(broker.c_str(), port);
+    // ! https://github.com/knolleary/pubsubclient/issues/375
+    static char pHost[64] = {0};
+    strcpy(pHost, broker.c_str());
+    mqttClient.setServer(pHost, port);
+    Serial.print("MQTT server set to ");
+    Serial.print(pHost);
+    Serial.print(":");
+    Serial.println(port);
   }
   mqttClient.setCallback(callback);
 }
@@ -52,7 +64,7 @@ void setupMqtt(MQTT_CALLBACK_SIGNATURE) {
 void reconnectMqtt() {
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection to ");
+    Serial.print("Attempting MQTT connection... ");
 
     // Attempt to connect
     if (mqttConnect()) {
@@ -71,4 +83,13 @@ void connectMqtt() {
   if (!mqttClient.connected()) {
     reconnectMqtt();
   }
+}
+
+const char* getSensorTopic(String sensorType) {
+  Preferences preferences;
+  preferences.begin(MQTT_NAMESPACE, false);
+  String deviceName = preferences.getString(MQTT_USERNAME, "");
+  String sensorsTopic = preferences.getString(MQTT_SENSORS_TOPIC, "");
+  preferences.end();
+  return (sensorsTopic + "/" + deviceName + "/" + sensorType).c_str();
 }

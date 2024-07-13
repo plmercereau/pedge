@@ -7,11 +7,11 @@ spec:
     name: devices-cluster
   builder:
     image:
-      repository: ghcr.io/plmercereau/pedge/firmware-builder-esp32
+      repository: ghcr.io/plmercereau/pedge/esp32-firmware-builder
       tag: latest
       pullPolicy: Always
   config:
     image:
-      repository: ghcr.io/plmercereau/pedge/config-builder-esp32
+      repository: ghcr.io/plmercereau/pedge/esp32-config-builder
       tag: latest
       pullPolicy: Always

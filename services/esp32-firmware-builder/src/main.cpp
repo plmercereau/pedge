@@ -39,13 +39,25 @@ void loop() {
   connectMqtt();
 
   // Subscribe
-  mqttClient.subscribe("sensors/device-sample/tempature");
+  // TODO shall I put it in the loop or in main?
+  // use sprintf to create the topic
+
+  // mqttClient.subscribe((SENSOR_TOPIC + "/temperature", topic).c_str());
 
   mqttClient.loop();
 
   long now = millis();
   if (now - lastMsg > 5000) {
     lastMsg = now;
-    mqttClient.publish("sensors/device-sample/tempature", "the message");
+    // TODO capture error
+    // uptime
+    mqttClient.publish(getSensorTopic("uptime"), String(now / 1000).c_str());
+
+    // TODO https://arduinojson.org/v6/how-to/use-arduinojson-with-pubsubclient/
+
+    // rssi
+    char buffer[1];
+    buffer[0] = WiFi.RSSI();
+    mqttClient.publish(getSensorTopic("rssi"), buffer, 1);
   }
 }

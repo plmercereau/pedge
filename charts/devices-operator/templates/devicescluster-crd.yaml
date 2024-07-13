@@ -58,6 +58,11 @@ spec:
                 type: object
               mqtt:
                 properties:
+                  hostname:
+                    type: string
+                  port:
+                    format: int32
+                    type: integer
                   sensorsTopic:
                     type: string
                 type: object

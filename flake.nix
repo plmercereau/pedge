@@ -23,8 +23,7 @@
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      packages = rec {
-        # ?
+      packages = {
         devenv-up = self.devShells.${system}.default.config.procfileScript;
       };
 
@@ -60,6 +59,7 @@
                   kustomize
                   yq-go
                   act
+                  python313
                   esptool
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                   (

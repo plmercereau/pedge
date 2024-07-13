@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"time"
@@ -204,21 +205,35 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 		logger.Error(err, "unable to fetch service")
 		return ctrl.Result{}, err
 	}
-	// TODO check if the service is a LoadBalancer and has an IP. Warn if more than one IP
-	serviceIngress := service.Status.LoadBalancer.Ingress[0]
+
 	var mqttBroker string
-	if serviceIngress.Hostname != "" {
-		mqttBroker = serviceIngress.Hostname
+	if devicesCluster.Spec.MQTT.Hostname != "" {
+		mqttBroker = devicesCluster.Spec.MQTT.Hostname
 	} else {
-		mqttBroker = serviceIngress.IP
-	}
-	mqttPortInt := -1
-	for _, port := range service.Spec.Ports {
-		if port.Name == "mqtt" {
-			mqttPortInt = int(port.Port)
-			break
+		serviceIngress := service.Status.LoadBalancer.Ingress[0]
+		if serviceIngress.Hostname != "" {
+			mqttBroker = serviceIngress.Hostname
+		} else {
+			mqttBroker = serviceIngress.IP
 		}
 	}
+	if mqttBroker == "" {
+		logger.Info("No MQTT broker found")
+		return ctrl.Result{}, errors.New("no MQTT broker found")
+	}
+
+	mqttPortInt := 1883
+	if devicesCluster.Spec.MQTT.Port != 0 {
+		mqttPortInt = int(devicesCluster.Spec.MQTT.Port)
+	} else {
+		for _, port := range service.Spec.Ports {
+			if port.Name == "mqtt" {
+				mqttPortInt = int(port.Port)
+				break
+			}
+		}
+	}
+
 	mqttPort := fmt.Sprint(mqttPortInt)
 
 	configBuilderImage := deviceClass.Spec.Config.Image
@@ -291,7 +306,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 									},
 								},
 								{
-									Name:  "SENSORS_TOPIC",
+									Name:  "MQTT_SENSORS_TOPIC",
 									Value: devicesCluster.Spec.MQTT.SensorsTopic,
 								},
 							},
@@ -303,13 +318,12 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 						{
 							Name:  "upload-secret",
 							Image: "busybox:1.36.1",
-							Command: []string{"sh", "-c", fmt.Sprintf(`mkdir -p %s/%s; cp %s/config.bin %s/%s/config.bin`,
+							Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p %s/%s; tar -czf %s/%s/config.tgz -C %s .",
 								storageMount.MountPath,
 								device.Name,
-								outputMount.MountPath,
 								storageMount.MountPath,
 								device.Name,
-							)},
+								outputMount.MountPath)},
 							VolumeMounts: []corev1.VolumeMount{
 								outputMount,
 								storageMount,

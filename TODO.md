@@ -1,4 +1,9 @@
+- forget about caddy and use flask
+- include caddy in the operator
+- include pvc/pv in the operator
+- improve config/caddy security with htpasswd
 - Include the lilygo code into the new esp32 firmware builder
+- rebuild devices configs when the hostname/port/sensor topic changes
 - DeviceGroup
   - used for loading common settings e.g. wifi settings
   - use a selector e.g. on labels

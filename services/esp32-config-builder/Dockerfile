@@ -16,13 +16,14 @@ RUN pip install cryptography
 WORKDIR /app
 
 # Copy the current directory contents into the container at /app
-COPY nvs_partition_gen.py csv_gen.py build.sh /app/
+COPY . /app/
 
 RUN mkdir -p /output /secrets
 
-ENV OUTPUT_FILE=/output/config.bin
+ENV OUTPUT_DIR=/output
 ENV SECRETS_PATH=/secrets
-ENV PARTITION_SIZE=0x6000
+ENV PARTITION_SIZE_HEXA=0x6000
+ENV PARTITION_OFFSET_HEXA=0x9000
 
 # Set the command to run the application
 ENTRYPOINT ["/app/build.sh"]

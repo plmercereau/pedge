@@ -5,9 +5,12 @@
 - name: influxdb-grafana
   helmContext: charts/influxdb-grafana
   version: 0.0.1
-- name: firmware-builder-esp32
-  dockerContext: firmware-builders/esp32
+- name: esp32-firmware-builder
+  dockerContext: services/esp32-firmware-builder
   version: 0.0.1
-- name: config-builder-esp32
-  dockerContext: config-builder/esp32
+- name: esp32-config-builder
+  dockerContext: services/esp32-config-builder
+  version: 0.0.1
+- name: firmware-http
+  dockerContext: services/firmware-http
   version: 0.0.1

@@ -17,16 +17,44 @@ helm_resource('rabbitmq-cluster-operator',
     flags = ['--version=4.2.10', '--create-namespace', '--set=useCertManager=true'],
     resource_deps = [ 'cert-manager'])
 
-k8s_yaml(kustomize('./examples/manifests'))
 
 # TODO wait for rabbitmq-cluster-operator
 k8s_yaml(helm('./charts/influxdb-grafana', values=['./charts/influxdb-grafana/values.yaml']))
 
 docker_build('ghcr.io/plmercereau/pedge/devices-operator:0.0.1', './devices-operator')
 
+# TODO watch files
 k8s_kind('DeviceClass', image_object={'json_path': '{.spec.builder.image}', 'repo_field': 'repository', 'tag_field': 'tag'})
-docker_build('ghcr.io/plmercereau/pedge/firmware-builder-esp32:latest', './firmware-builders/esp32')
-k8s_kind('DeviceClass', image_object={'json_path': '{.spec.config.image}', 'repo_field': 'repository', 'tag_field': 'tag'})
-docker_build('ghcr.io/plmercereau/pedge/config-builder-esp32:latest', './config-builders/esp32')
+docker_build('ghcr.io/plmercereau/pedge/esp32-firmware-builder:latest', './services/esp32-firmware-builder')
 
-k8s_yaml(kustomize ( './devices-operator/config/default'))
+k8s_kind('DeviceClass', image_object={'json_path': '{.spec.config.image}', 'repo_field': 'repository', 'tag_field': 'tag'})
+docker_build('ghcr.io/plmercereau/pedge/esp32-config-builder:latest', './services/esp32-config-builder')
+
+k8s_yaml(kustomize('./devices-operator/config/default'))
+k8s_yaml(kustomize('./examples/manifests'))
+
+k8s_resource(
+    objects=['my-cluster'],
+    new_name="my-cluster",
+ )
+
+# TODO document in the readme, development section
+local_resource( 
+    'ngrok',
+    serve_cmd='ngrok start mqtt',
+    readiness_probe=probe(
+      period_secs=5,
+      http_get=http_get_action(port=4040, path="/api")
+   ) 
+)
+
+local_resource(
+    'update-mqtt-hostname',
+    """
+    URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+    HOST=$(echo $URL | awk -F[/:] '{print $4}')
+    PORT=$(echo $URL | awk -F[/:] '{print $5}')
+    kubectl patch DevicesCluster my-cluster --type='json' -p="[{'op': 'replace', 'path': '/spec/mqtt/hostname', 'value': '$HOST'},{'op': 'replace', 'path': '/spec/mqtt/port', 'value': $PORT}]"
+    """,
+    resource_deps=['ngrok', 'my-cluster']
+)

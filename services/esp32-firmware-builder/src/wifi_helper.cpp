@@ -1,5 +1,7 @@
 #include "wifi_helper.h"
 
+#include <Preferences.h>
+
 void setupWifi() {
   Preferences preferences;
   preferences.begin(CUSTOM_NAMESPACE, false);
@@ -27,6 +29,10 @@ void setupWifi() {
     Serial.println("WiFi connected.");
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
+    Serial.print("Gateway: ");
+    Serial.println(WiFi.gatewayIP());
+    Serial.print("DNS: ");
+    Serial.println(WiFi.dnsIP());
   }
 
   preferences.end();

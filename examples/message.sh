@@ -1,10 +1,11 @@
 #!/bin/bash
-
-NAMESPACE=pedge-devices-system
-CLUSTER_NAME=devices-cluster
+# SERVER=6.tcp.eu.ngrok.io:13468
+SERVER=localhost
+NAMESPACE=default
+CLUSTER_NAME=my-cluster
 TOPIC=sensors
 
-USERNAME=device-sample
+USERNAME=esp32cam
 # SECRET=$CLUSTER_NAME-default-user
 SECRET=$USERNAME-user-credentials
 USER=$(kubectl -n $NAMESPACE get secret $SECRET -o jsonpath="{.data.username}" | base64 -d)
@@ -15,7 +16,7 @@ while true;
 do
 RANDOM_NUMBER=$(( ( RANDOM % 15 ) + 1 ))
 
-mqttui -b mqtt://localhost -u $USER \
+mqttui -b mqtt://$SERVER -u $USER \
     --password "$PASSWORD" \
     publish $TOPIC/$USERNAME/coordinates \
     '{ "latitude": 50.850346, "longitude": 4.851721 }'

@@ -5,6 +5,8 @@ metadata:
 spec:
   persistentVolumeClaimName: devices
   mqtt:
+    # hostname: mqtt.example.com
+    # port: 1883
     sensorsTopic: sensors
   influxdb:
     # name: influxdb

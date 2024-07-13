@@ -8,6 +8,10 @@ import (
 type MQTTSpec struct {
 	// +kubebuilder:validation:Required
 	SensorsTopic string `json:"sensorsTopic,omitempty"`
+	// +kubebuilder:validation:Optional
+	Hostname string `json:"hostname,omitempty"`
+	// +kubebuilder:validation:Optional
+	Port int32 `json:"port,omitempty"`
 }
 
 type InfluxDB struct {

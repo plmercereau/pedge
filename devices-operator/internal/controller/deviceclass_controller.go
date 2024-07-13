@@ -88,7 +88,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 						{
 							Name:  "upload-firmware",
 							Image: "busybox:1.36.1",
-							Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p %s/%s; tar -czf %s/%s/firmware.tgz %s/*",
+							Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p %s/%s; tar -czf %s/%s/firmware.tgz -C %s .",
 								storageMount.MountPath,
 								deviceClass.Name,
 								storageMount.MountPath,
