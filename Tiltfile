@@ -25,10 +25,15 @@ docker_build('ghcr.io/plmercereau/pedge/devices-operator:0.0.1', './devices-oper
 
 # TODO watch files
 k8s_kind('DeviceClass', image_object={'json_path': '{.spec.builder.image}', 'repo_field': 'repository', 'tag_field': 'tag'})
-docker_build('ghcr.io/plmercereau/pedge/esp32-firmware-builder:latest', './services/esp32-firmware-builder')
+docker_build('ghcr.io/plmercereau/pedge/esp32-firmware-builder:0.0.1', './services/esp32-firmware-builder')
 
 k8s_kind('DeviceClass', image_object={'json_path': '{.spec.config.image}', 'repo_field': 'repository', 'tag_field': 'tag'})
-docker_build('ghcr.io/plmercereau/pedge/esp32-config-builder:latest', './services/esp32-config-builder')
+docker_build('ghcr.io/plmercereau/pedge/esp32-config-builder:0.0.1', './services/esp32-config-builder')
+
+k8s_kind('Job', image_json_path = '{.spec.containers.image}')
+
+docker_build('ghcr.io/plmercereau/pedge/firmware-http:0.0.1', './services/firmware-http',)
+
 
 k8s_yaml(kustomize('./devices-operator/config/default'))
 k8s_yaml(kustomize('./examples/manifests'))

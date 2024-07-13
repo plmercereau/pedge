@@ -1,4 +1,7 @@
 FROM python:3.11-alpine as base
+RUN apk add --update --no-cache --virtual .tmp-build-deps \
+    gcc libc-dev linux-headers postgresql-dev \
+    && apk add libffi-dev
 
 # Stage 1: Build stage
 FROM base AS builder

@@ -1,14 +1,16 @@
 from flask import Flask, send_from_directory, request, abort, jsonify
 import os
 import base64
-import bcrypt
+from argon2 import PasswordHasher
 
 app = Flask(__name__)
 
 # Directory paths
-FIRMWARE_DIR = '/data/firmware'
+FIRMWARE_DIR = '/data/firmwares'
 CONFIGURATIONS_DIR = '/data/configurations'
 AUTH_DIR = '/data/auth'
+
+ph = PasswordHasher()
 
 def check_auth(device, password):
     """Check if the password matches the hash stored for the device."""
@@ -16,7 +18,11 @@ def check_auth(device, password):
     if os.path.exists(hash_file):
         with open(hash_file, 'rb') as file:
             stored_hash = file.read().strip()
-        return bcrypt.checkpw(password.encode('utf-8'), stored_hash)
+            try:
+                ph.verify(stored_hash, password)
+                return True
+            except:
+                return False
     return False
 
 def authenticate():
@@ -32,9 +38,10 @@ def requires_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-@app.route('/firmware/<path:filename>')
+@app.route('/firmwares/<path:filename>')
 def serve_firmware(filename):
     """Serve firmware files."""
+    app.logger.debug(f"Request for firmware: {filename}")
     return send_from_directory(FIRMWARE_DIR, filename)
 
 @app.route('/configurations/<device>/<path:filename>')

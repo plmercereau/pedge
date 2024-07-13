@@ -248,7 +248,6 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 	storageMount := corev1.VolumeMount{
 		Name:      "data",
 		MountPath: "/data",
-		SubPath:   "configurations",
 	}
 
 	job := &batchv1.Job{
@@ -311,6 +310,30 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 								},
 							},
 						},
+						{
+							Name:  "store-hash",
+							Image: "leplusorg/hash:sha-657c8c8",
+							Command: []string{"sh", "-c", fmt.Sprintf(`mkdir -p %s/auth; echo -n "$PASSWORD" | argon2 saltItWithSalt -id -e > %s/auth/%s.hash`,
+								storageMount.MountPath,
+								storageMount.MountPath,
+								device.Name)},
+							VolumeMounts: []corev1.VolumeMount{
+								storageMount,
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "PASSWORD",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: device.Name + deviceSecretSuffix,
+											},
+											Key: "password",
+										},
+									},
+								},
+							},
+						},
 					},
 					Containers: []corev1.Container{
 						// Use a persistent volume to store the firmware
@@ -318,7 +341,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 						{
 							Name:  "upload-secret",
 							Image: "busybox:1.36.1",
-							Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p %s/%s; tar -czf %s/%s/config.tgz -C %s .",
+							Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p %s/configurations/%s; tar -czf %s/configurations/%s/config.tgz -C %s .",
 								storageMount.MountPath,
 								device.Name,
 								storageMount.MountPath,
