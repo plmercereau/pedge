@@ -9,7 +9,6 @@
       - device > device group > device class > devices cluster
       - think of another label to sort device groups e.g. `priority`
   - `spec.secret.name`
-- rename DeviceCluster to DeviceCluster (singular)
 - develop a rancher UI interface
 
   - CRUD devices
