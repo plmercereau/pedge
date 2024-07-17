@@ -35,6 +35,27 @@ spec:
           spec:
             description: DeviceClusterSpec defines the desired state of DeviceCluster
             properties:
+              artefacts:
+                properties:
+                  image:
+                    properties:
+                      pullPolicy:
+                        description: PullPolicy describes a policy for if/when to pull
+                          a container image
+                        type: string
+                      repository:
+                        type: string
+                      tag:
+                        type: string
+                    type: object
+                  ingress:
+                    properties:
+                      enabled:
+                        type: boolean
+                      hostname:
+                        type: string
+                    type: object
+                type: object
               influxdb:
                 properties:
                   namespace:

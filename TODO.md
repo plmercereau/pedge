@@ -1,4 +1,3 @@
-- include the devices server in the operator
 - include pvc/pv in the operator
 - Include the lilygo code into the new esp32 firmware builder
 - rebuild devices configs when the hostname/port/sensor topic changes
@@ -19,7 +18,6 @@
 
 ## Backlog
 
-- find a better name for 'firmware-http'
 - validation/default hooks
 - device sensors
   - should we determine sensors when building the firmware, or in the config partition/file?
@@ -31,6 +29,8 @@
 - create service accounts
   - only allowed to create/manage a device cluster
   - only allowed to manage devices
+- Development instructions  
+  - make ngrok optional
 
 ## Next
 

@@ -5,6 +5,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type ArtefactsSpec struct {
+	Image   ImageRef    `json:"image,omitempty"`
+	Ingress IngressSpec `json:"ingress,omitempty"`
+}
+
+type IngressSpec struct {
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled,omitempty"`
+	// +kubebuilder:validation:Required
+	Hostname string `json:"hostname,omitempty"`
+}
+
 type MQTTSpec struct {
 	// +kubebuilder:validation:Required
 	SensorsTopic string `json:"sensorsTopic,omitempty"`
@@ -26,6 +38,7 @@ type InfluxDB struct {
 
 // DeviceClusterSpec defines the desired state of DeviceCluster
 type DeviceClusterSpec struct {
+	Artefacts ArtefactsSpec `json:"artefacts,omitempty"`
 	// +kubebuilder:validation:Required
 	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
 	// +kubebuilder:validation:Required

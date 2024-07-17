@@ -4,6 +4,13 @@ metadata:
   name: my-cluster
 spec:
   persistentVolumeClaimName: devices
+  artefacts:
+    image:
+      repository: ghcr.io/plmercereau/pedge/firmware-artefacts
+      tag: latest
+    ingress:
+      enabled: true
+      hostname: devices.local
   mqtt:
     # hostname: mqtt.example.com
     # port: 1883

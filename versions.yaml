@@ -11,6 +11,6 @@
 - name: esp32-config-builder
   dockerContext: services/esp32-config-builder
   version: 0.0.1
-- name: firmware-http
-  dockerContext: services/firmware-http
+- name: firmware-artefacts
+  dockerContext: services/firmware-artefacts
   version: 0.0.1

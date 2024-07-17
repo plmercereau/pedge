@@ -7,14 +7,9 @@ import (
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-type FirmwareBuilderImage struct {
-	Repository string          `json:"repository,omitempty"`
-	Tag        string          `json:"tag,omitempty"`
-	PullPolicy core.PullPolicy `json:"pullPolicy,omitempty"`
-}
 
 type FirmwareBuilder struct {
-	Image FirmwareBuilderImage `json:"image,omitempty"`
+	Image ImageRef `json:"image,omitempty"`
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
@@ -24,7 +19,7 @@ type FirmwareBuilder struct {
 }
 
 type ConfigBuilder struct {
-	Image FirmwareBuilderImage `json:"image,omitempty"`
+	Image ImageRef `json:"image,omitempty"`
 }
 
 type DeviceClusterReference struct {
