@@ -1,0 +1,21 @@
+apiVersion: devices.pedge.io/v1alpha1
+kind: DeviceCluster
+metadata:
+  name: my-cluster
+spec:
+  artefacts:
+    image:
+      repository: ghcr.io/plmercereau/pedge/firmware-artefacts
+      tag: latest
+    ingress:
+      enabled: true
+      hostname: devices.local
+  mqtt:
+    # hostname: mqtt.example.com
+    # port: 1883
+    sensorsTopic: sensors
+  influxdb:
+    # name: influxdb
+    namespace: default
+    secretReference:
+      name: influxdb-auth

@@ -23,8 +23,7 @@
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      packages = rec {
-        # ?
+      packages = {
         devenv-up = self.devShells.${system}.default.config.procfileScript;
       };
 
@@ -42,7 +41,7 @@
                 pre-commit.hooks.make-device-operator-helm = {
                   enable = true;
                   name = "Generate the Device Operator Helm chart";
-                  entry = "bash -c 'cd devices-operator && make helm'";
+                  entry = "bash -c 'cd devices-operator && make helm && git add ../charts/devices-operator'";
                   files = "^devices-operator/.*\\.(go|yaml)$";
                   pass_filenames = false;
                 };
@@ -60,6 +59,8 @@
                   kustomize
                   yq-go
                   act
+                  python313
+                  esptool
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                   (
                     # operator-sdk package not working

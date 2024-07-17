@@ -5,6 +5,18 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - batch
   resources:
   - jobs
@@ -26,6 +38,19 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - persistentvolumeclaims
+  - persistentvolumes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - create
@@ -38,11 +63,74 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - services
+  - secrets
+  - serviceaccounts
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - deviceclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - deviceclasses/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - deviceclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - devices.pedge.io
+  resources:
+  - deviceclusters/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - devices.pedge.io
   resources:
@@ -64,49 +152,9 @@ rules:
   - patch
   - update
 - apiGroups:
-  - devices.pedge.io
+  - networking.k8s.io
   resources:
-  - devicesclusters
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - devicesclusters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - firmwares
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - devices.pedge.io
-  resources:
-  - firmwares/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - minio.min.io
-  resources:
-  - tenants
+  - ingresses
   verbs:
   - create
   - delete

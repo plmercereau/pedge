@@ -1,0 +1,20 @@
+apiVersion: devices.pedge.io/v1alpha1
+kind: DeviceClass
+metadata:
+  name: esp32cam
+spec:
+  deviceClusterReference:
+    name: my-cluster
+  builder:
+    image:
+      repository: ghcr.io/plmercereau/pedge/esp32-firmware-builder
+      tag: latest
+      pullPolicy: IfNotPresent
+    env:
+      - name: TARGET
+        value: esp32cam
+  config:
+    image:
+      repository: ghcr.io/plmercereau/pedge/esp32-config-builder
+      tag: latest
+      pullPolicy: IfNotPresent

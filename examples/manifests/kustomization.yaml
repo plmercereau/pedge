@@ -1,0 +1,10 @@
+resources:
+  - devicecluster.yaml
+  - deviceclass_esp32cam.yaml
+  - device_esp32cam.yaml
+  - esp32cam-user-credentials.yaml
+secretGenerator:
+  - name: esp32cam-user-credentials
+    envs:
+      - .esp32cam.env
+    behavior: merge

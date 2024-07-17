@@ -2,15 +2,19 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"time"
 
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	errorutils "k8s.io/apimachinery/pkg/util/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,10 +32,8 @@ import (
 const (
 	// The suffix should not change: the rabbitmq operator takes ownership of it,
 	// and still creates a -user-credentials secret even when asked otherwise. Investigate.
-	deviceSecretSuffix      = "-user-credentials"
-	secretNameLabel         = "pedge.io/secret-name"
-	secretVersionAnnotation = "pedge.io/secret-version"
-	serviceAnnotation       = "pedge.io/service"
+	deviceSecretSuffix     = "-user-credentials"
+	configBuilderJobSuffix = "-config-build"
 )
 
 // DeviceReconciler reconciles a Device object
@@ -50,65 +52,82 @@ type DeviceReconciler struct {
 
 func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	logger.Info("Reconciling Device")
-	// Fetch the Device instance
+
 	device := &pedgev1alpha1.Device{}
-	err := r.Get(ctx, req.NamespacedName, device)
+	if err := r.Get(ctx, req.NamespacedName, device); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.V(5).Info("Object was not found, not an error")
+			return reconcile.Result{}, nil
+		}
+		return reconcile.Result{}, fmt.Errorf("failed to get device object: %w", err)
+	}
+
+	// Collect errors as an aggregate to return together after all patches have been performed.
+	var errs []error
+
+	result, err := r.reconcile(ctx, device)
 	if err != nil {
-		if client.IgnoreNotFound(err) == nil {
-			return ctrl.Result{}, nil
-		}
-		logger.Error(err, "unable to fetch device")
-		return ctrl.Result{}, err
-	}
-	logger.Info("Fetched device " + device.Name)
-	// Fetch the referenced Firmware instance
-	var firmware *pedgev1alpha1.Firmware
-	if device.Spec.FirmwareReference != (pedgev1alpha1.FirmwareReference{}) {
-		firmware = &pedgev1alpha1.Firmware{}
-		err := r.Get(ctx, types.NamespacedName{Name: device.Spec.FirmwareReference.Name, Namespace: device.Namespace}, firmware)
-		if err != nil {
-			logger.Error(err, "unable to fetch firmware")
-			return ctrl.Result{}, err
-		}
+		errs = append(errs, fmt.Errorf("error reconciling device object: %w", err))
 	}
 
-	devicesCluster := &pedgev1alpha1.DevicesCluster{}
-	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DevicesClusterReference.Name, Namespace: device.Namespace}, devicesCluster); err != nil {
-		logger.Error(err, "unable to fetch DevicesCluster")
+	patchBase := client.MergeFrom(device.DeepCopy())
+	deviceStatusCopy := device.Status.DeepCopy() // Patch call will erase the status
+
+	if err := r.Patch(ctx, device, patchBase); err != nil && !apierrors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to patch device object: %w", err))
+	}
+
+	device.Status = *deviceStatusCopy
+
+	if err := r.Status().Patch(ctx, device, patchBase); err != nil && !apierrors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to patch status for device object: %w", err))
+	}
+
+	if len(errs) > 0 {
+		return ctrl.Result{}, errorutils.NewAggregate(errs)
+	}
+
+	return result, nil
+}
+
+func (r *DeviceReconciler) reconcile(ctx context.Context, device *pedgev1alpha1.Device) (ctrl.Result, error) {
+
+	if err := r.createSecret(ctx, device); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Sync resources
-	if err := r.syncResources(ctx, device, firmware, devicesCluster); err != nil {
+	if result, err := r.createJob(ctx, device); err != nil {
+		return ctrl.Result{}, err
+	} else if result != (ctrl.Result{}) {
+		return result, nil
+	}
+
+	if _, err := r.createRabbitmqResources(ctx, device); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// syncResources creates or updates the associated resources
-func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alpha1.Device, firmware *pedgev1alpha1.Firmware, devicesCluster *pedgev1alpha1.DevicesCluster) error {
-	logger := log.FromContext(ctx)
-
+func (r *DeviceReconciler) createSecret(ctx context.Context, device *pedgev1alpha1.Device) error {
+	logger := ctrl.LoggerFrom(ctx)
 	// Secret
 	secretName := device.Name + deviceSecretSuffix
 	var secret corev1.Secret
-	var secretVersion string
+
 	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: device.Namespace}, &secret); err != nil {
-		logger.Info("Creating new secret " + secretName)
+		logger.Info("Creating a new secret " + secretName)
 		secret = corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,
 				Namespace: device.Namespace,
-			},
-			Data: map[string][]byte{
-				"username": []byte(device.Name),
-				"password": []byte(generateRandomPassword(16)),
-				"gsm_pin":  []byte(""),
+				Labels: map[string]string{
+					secretTypeLabel: "device",
+					deviceNameLabel: device.Name,
+				},
 			},
 		}
-		// Set the ownerRef for the secret to ensure it gets cleaned up when the device is deleted
+		// ? Set the ownerRef for the secret to ensure it gets cleaned up when the device is deleted
 		// if err := ctrl.SetControllerReference(device, secret, r.Scheme); err != nil {
 		// 	return err
 		// }
@@ -118,39 +137,278 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 			return err
 		}
 	} else {
-		changed := false
-		if secret.Data["gsm_pin"] == nil {
-			secret.Data["gsm_pin"] = []byte("")
-			changed = true
+		patch := client.MergeFrom(secret.DeepCopy())
+		if secret.Labels == nil {
+			secret.Labels = make(map[string]string)
 		}
-		username := string(secret.Data["username"])
-		if string(secret.Data["username"]) != device.Name {
-			logger.Info("Mismatching username in " + secretName + ". Expected " + device.Name + " but found " + username + ". Overriding the value")
-			secret.Data["username"] = []byte(device.Name)
-			changed = true
+		secret.Labels[deviceNameLabel] = device.Name
+		secret.Labels[secretTypeLabel] = "device"
+		// patch the secret with the new labels - not using update but patch to avoid conflicts
+		if err := r.Patch(ctx, &secret, patch); err != nil {
+			logger.Error(err, "Unable to patch secret "+secretName)
+			return err
 		}
-		if changed {
-			if err := r.Update(ctx, &secret); err != nil {
-				logger.Error(err, "Unable to update secret "+secretName)
-				return err
+	}
+	return nil
+}
+
+func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.Device) (ctrl.Result, error) {
+	logger := ctrl.LoggerFrom(ctx)
+	jobName := device.Name + configBuilderJobSuffix
+	existingJob := &batchv1.Job{}
+	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: device.Namespace}, existingJob)
+	if err == nil {
+		// Job exists, check if it is being deleted
+		if existingJob.GetDeletionTimestamp() != nil {
+			// Job is being deleted, requeue after some time
+			logger.Info("Job is being deleted, requeuing", "job", jobName)
+			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+		}
+		// Requeue if the job is not completed yet (success or failure)
+		if existingJob.Status.CompletionTime == nil {
+			logger.Info("Job is not completed yet, requeuing", "job", jobName)
+			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+		}
+
+		// Delete the existing Job
+		if err := r.Delete(ctx, existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+			logger.Error(err, "unable to delete existing Job", "job", jobName)
+			return ctrl.Result{}, err
+		}
+
+		// Requeue until the job is deleted
+		logger.Info("Existing Job deleted, requeuing for new job creation", "job", jobName)
+		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+	} else {
+		if !apierrors.IsNotFound(err) {
+			logger.Error(err, "unable to fetch existing Job")
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Fetch the referenced DeviceClass instance
+	var deviceClass pedgev1alpha1.DeviceClass
+	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClassReference.Name, Namespace: device.Namespace}, &deviceClass); err != nil {
+		logger.Error(err, "unable to fetch Device Class")
+		return ctrl.Result{}, err
+	}
+
+	var deviceCluster pedgev1alpha1.DeviceCluster
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DeviceClusterReference.Name, Namespace: deviceClass.Namespace}, &deviceCluster); err != nil {
+		logger.Error(err, "unable to fetch Devices Cluster")
+		return ctrl.Result{}, err
+	}
+
+	// TODO use possible custom broker/port values in the DeviceCluster spec instead of the service
+	service := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceCluster.Name, Namespace: deviceCluster.Namespace}, service); err != nil {
+		logger.Error(err, "unable to fetch service")
+		return ctrl.Result{}, err
+	}
+
+	var mqttBroker string
+	if deviceCluster.Spec.MQTT.Hostname != "" {
+		mqttBroker = deviceCluster.Spec.MQTT.Hostname
+	} else {
+		serviceIngress := service.Status.LoadBalancer.Ingress[0]
+		if serviceIngress.Hostname != "" {
+			mqttBroker = serviceIngress.Hostname
+		} else {
+			mqttBroker = serviceIngress.IP
+		}
+	}
+	if mqttBroker == "" {
+		logger.Info("No MQTT broker found")
+		return ctrl.Result{}, errors.New("no MQTT broker found")
+	}
+
+	mqttPortInt := 1883
+	if deviceCluster.Spec.MQTT.Port != 0 {
+		mqttPortInt = int(deviceCluster.Spec.MQTT.Port)
+	} else {
+		for _, port := range service.Spec.Ports {
+			if port.Name == "mqtt" {
+				mqttPortInt = int(port.Port)
+				break
 			}
 		}
 	}
-	secretVersion = secret.ResourceVersion
 
-	// Check if labels map is nil
-	if device.Labels == nil {
-		device.Labels = make(map[string]string)
+	mqttPort := fmt.Sprint(mqttPortInt)
+
+	configBuilderImage := deviceClass.Spec.Config.Image
+	outputMount := corev1.VolumeMount{
+		Name:      "output",
+		MountPath: "/output",
+	}
+	secretsMount := corev1.VolumeMount{
+		Name:      "secrets",
+		MountPath: "/secrets",
+	}
+	storageMount := corev1.VolumeMount{
+		Name:      "data",
+		MountPath: "/data",
 	}
 
-	// Add the secret name to the device labels
-	device.Labels[secretNameLabel] = secretName
-
-	// Update the Device resource
-	if err := r.Client.Update(ctx, device); err != nil {
-		return err
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: device.Namespace,
+			Labels: map[string]string{
+				"job-name": jobName,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"job-name": jobName,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"job-name": jobName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name:            "build-config",
+							Image:           fmt.Sprintf("%s:%s", configBuilderImage.Repository, configBuilderImage.Tag),
+							ImagePullPolicy: configBuilderImage.PullPolicy,
+							VolumeMounts: []corev1.VolumeMount{
+								secretsMount,
+								outputMount,
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "MQTT_BROKER",
+									Value: mqttBroker,
+								},
+								{
+									Name:  "MQTT_PORT",
+									Value: mqttPort,
+								},
+								{
+									Name:  "MQTT_USERNAME",
+									Value: device.Name,
+								},
+								{
+									Name: "MQTT_PASSWORD",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: device.Name + deviceSecretSuffix,
+											},
+											Key: "password",
+										},
+									},
+								},
+								{
+									Name:  "MQTT_SENSORS_TOPIC",
+									Value: deviceCluster.Spec.MQTT.SensorsTopic,
+								},
+							},
+						},
+						{
+							Name:  "store-hash",
+							Image: "leplusorg/hash:sha-657c8c8",
+							Command: []string{"sh", "-c", fmt.Sprintf(`mkdir -p %s/auth; echo -n "$PASSWORD" | argon2 saltItWithSalt -id -e > %s/auth/%s.hash`,
+								storageMount.MountPath,
+								storageMount.MountPath,
+								device.Name)},
+							VolumeMounts: []corev1.VolumeMount{
+								storageMount,
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "PASSWORD",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: device.Name + deviceSecretSuffix,
+											},
+											Key: "password",
+										},
+									},
+								},
+							},
+						},
+					},
+					Containers: []corev1.Container{
+						// Use a persistent volume to store the firmware
+						{
+							Name:  "upload-secret",
+							Image: "busybox:1.36.1",
+							Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p %s/configurations/%s; tar -czf %s/configurations/%s/config.tgz -C %s .",
+								storageMount.MountPath,
+								device.Name,
+								storageMount.MountPath,
+								device.Name,
+								outputMount.MountPath)},
+							VolumeMounts: []corev1.VolumeMount{
+								outputMount,
+								storageMount,
+							},
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyOnFailure,
+					Volumes: []corev1.Volume{
+						{
+							Name: secretsMount.Name,
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: device.Name + deviceSecretSuffix,
+									Optional:   func(b bool) *bool { return &b }(true),
+								},
+							},
+						},
+						{
+							Name: outputMount.Name,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: storageMount.Name,
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: deviceCluster.Name + artefactSuffix,
+								},
+							},
+						},
+					},
+				},
+			},
+			BackoffLimit: func(i int32) *int32 { return &i }(4),
+		},
 	}
 
+	// Set the ownerRef for the Job to ensure it gets cleaned up when the device is deleted
+	if err := ctrl.SetControllerReference(device, job, r.Scheme); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.Create(ctx, job); err != nil {
+		return ctrl.Result{}, err
+	}
+	logger.Info("Job created", "job", job.Name)
+	return ctrl.Result{}, nil
+}
+
+func (r *DeviceReconciler) createRabbitmqResources(ctx context.Context, device *pedgev1alpha1.Device) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	deviceClass := &pedgev1alpha1.DeviceClass{}
+	if err := r.Get(ctx, types.NamespacedName{Name: device.Spec.DeviceClassReference.Name, Namespace: device.Namespace}, deviceClass); err != nil {
+		logger.Error(err, "unable to fetch deviceClass")
+		return ctrl.Result{}, err
+	}
+
+	deviceCluster := &pedgev1alpha1.DeviceCluster{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceClass.Spec.DeviceClusterReference.Name, Namespace: device.Namespace}, deviceCluster); err != nil {
+		logger.Error(err, "unable to fetch DeviceCluster")
+		return ctrl.Result{}, err
+	}
 	// Define the desired RabbitMQ User resource
 	user := &rabbitmqtopologyv1.User{
 		ObjectMeta: metav1.ObjectMeta{
@@ -159,17 +417,13 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
 			},
-			Annotations: map[string]string{
-				// Needed to trigger a reconciliation when the password changes
-				secretVersionAnnotation: secretVersion,
-			},
 		},
 		Spec: rabbitmqtopologyv1.UserSpec{
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name: devicesCluster.Name,
+				Name: deviceCluster.Name,
 			},
 			ImportCredentialsSecret: &corev1.LocalObjectReference{
-				Name: secretName,
+				Name: device.Name + deviceSecretSuffix,
 			},
 		},
 	}
@@ -179,9 +433,10 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      device.Name,
 			Namespace: device.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
-			},
+			// ? RabbitMQ does not want to loose ownership of the resource
+			// OwnerReferences: []metav1.OwnerReference{
+			// 	*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
+			// },
 		},
 		Spec: rabbitmqtopologyv1.PermissionSpec{
 			Vhost: "/",
@@ -194,8 +449,8 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 				Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      devicesCluster.Name,
-				Namespace: devicesCluster.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
@@ -205,9 +460,10 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      device.Name,
 			Namespace: device.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
-			},
+			// ? RabbitMQ does not want to loose ownership of the resource
+			// OwnerReferences: []metav1.OwnerReference{
+			// 	*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
+			// },
 		},
 		Spec: rabbitmqtopologyv1.TopicPermissionSpec{
 			Vhost: "/",
@@ -216,13 +472,13 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 			},
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
-				Write:    fmt.Sprintf("^%s\\.%s\\..+$", devicesCluster.Spec.MQTT.SensorsTopic, device.Name),
+				Write:    fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic, device.Name),
 				// TODO narrow down the read permissions: the device should only be able to write to its own topic
-				Read: fmt.Sprintf("^%s\\.%s\\..+$", devicesCluster.Spec.MQTT.SensorsTopic, device.Name),
+				Read: fmt.Sprintf("^%s\\.%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic, device.Name),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      devicesCluster.Name,
-				Namespace: devicesCluster.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
@@ -230,180 +486,11 @@ func (r *DeviceReconciler) syncResources(ctx context.Context, device *pedgev1alp
 	resources := []client.Object{user, permission, topicPermission}
 	for _, res := range resources {
 		if err := r.CreateOrUpdate(ctx, res); err != nil {
-			return err
+			return ctrl.Result{}, err
 		}
 	}
+	return ctrl.Result{}, nil
 
-	if firmware != nil {
-		logger.Info("Found firmware. Generating job...")
-		jobName := device.Name + "-firmware-build"
-		builderImage := firmware.Spec.Builder.Image
-		job := &batchv1.Job{}
-		err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: device.Namespace}, job)
-		if err != nil && errors.IsNotFound(err) {
-			logger.Info("Creating new firmware build job " + jobName)
-			service := &corev1.Service{}
-			err := r.Get(ctx, types.NamespacedName{Name: devicesCluster.Name, Namespace: devicesCluster.Namespace}, service)
-			if err != nil {
-				logger.Error(err, "unable to fetch service")
-				return err
-			}
-			// TODO check if the service is a LoadBalancer and has an IP. Warn if more than one IP
-			// TODO use possible custom broker/port values in the DevicesCluster spec
-			serviceIngress := service.Status.LoadBalancer.Ingress[0]
-			var mqttBroker string
-			if serviceIngress.Hostname != "" {
-				mqttBroker = serviceIngress.Hostname
-			} else {
-				mqttBroker = serviceIngress.IP
-			}
-			mqttPortInt := -1
-			for _, port := range service.Spec.Ports {
-				if port.Name == "mqtt" {
-					mqttPortInt = int(port.Port)
-					break
-				}
-			}
-			mqttPort := fmt.Sprint(mqttPortInt)
-			job := &batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      jobName,
-					Namespace: device.Namespace,
-					OwnerReferences: []metav1.OwnerReference{
-						*metav1.NewControllerRef(device, pedgev1alpha1.GroupVersion.WithKind("Device")),
-					},
-				},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						// By setting the annotation, we make sure that the Job is re-triggered when the firmware changes
-						// Re-trigger the job when the firmware, secret changes or service changes
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								// We don't need annotate changes in the firmare as for now only the builder image can change
-								secretVersionAnnotation: secretVersion,
-								serviceAnnotation:       fmt.Sprintf("%s:%s", mqttBroker, mqttPort),
-							},
-						},
-						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{
-								{
-									Name:            "build-firmware",
-									Image:           fmt.Sprintf("%s/%s:%s", builderImage.Registry, builderImage.Repository, builderImage.Tag),
-									ImagePullPolicy: corev1.PullPolicy(builderImage.PullPolicy),
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "firmware",
-											MountPath: "/firmware",
-										},
-									},
-									Env: []corev1.EnvVar{
-										{
-											Name: "GSM_PIN",
-											ValueFrom: &corev1.EnvVarSource{
-												SecretKeyRef: &corev1.SecretKeySelector{
-													LocalObjectReference: corev1.LocalObjectReference{
-														Name: secretName,
-													},
-													Key: "gsm_pin",
-												},
-											},
-										},
-										{
-											Name:  "MQTT_BROKER",
-											Value: mqttBroker,
-										},
-										{
-											Name:  "MQTT_PORT",
-											Value: mqttPort,
-										},
-										{
-											Name:  "DEVICE_NAME",
-											Value: device.Name,
-										},
-										{
-											Name: "MQTT_PASSWORD",
-											ValueFrom: &corev1.EnvVarSource{
-												SecretKeyRef: &corev1.SecretKeySelector{
-													LocalObjectReference: corev1.LocalObjectReference{
-														Name: secretName,
-													},
-													Key: "password",
-												},
-											},
-										},
-									},
-								},
-							},
-							Containers: []corev1.Container{
-								{
-									Name:    "upload-firmware",
-									Image:   "amazon/aws-cli:2.16.6",
-									Command: []string{"sh", "-c", fmt.Sprintf("aws --no-verify-ssl s3 cp /firmware/firmware.bin s3://%s/%s.bin", bucketName, device.Name)},
-									Env: []corev1.EnvVar{
-										{
-											Name:  "AWS_ENDPOINT_URL_S3",
-											Value: fmt.Sprintf("https://minio.%s.svc.cluster.local", devicesCluster.Namespace),
-										},
-										{
-											Name:  "AWS_DEFAULT_REGION",
-											Value: bucketRegion,
-										},
-										{
-											Name: "AWS_ACCESS_KEY_ID",
-											ValueFrom: &corev1.EnvVarSource{
-												SecretKeyRef: &corev1.SecretKeySelector{
-													LocalObjectReference: corev1.LocalObjectReference{
-														Name: devicesCluster.Name + devicesClusterSecretSuffix,
-													},
-													Key: s3AccessKeyId,
-												},
-											},
-										},
-										{
-											Name: "AWS_SECRET_ACCESS_KEY",
-											ValueFrom: &corev1.EnvVarSource{
-												SecretKeyRef: &corev1.SecretKeySelector{
-													LocalObjectReference: corev1.LocalObjectReference{
-														Name: devicesCluster.Name + devicesClusterSecretSuffix,
-													},
-													Key: s3SecretAccessKey,
-												},
-											},
-										},
-									},
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "firmware",
-											MountPath: "/firmware",
-										},
-									},
-								},
-							},
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-							Volumes: []corev1.Volume{
-								{
-									Name: "firmware",
-									VolumeSource: corev1.VolumeSource{
-										EmptyDir: &corev1.EmptyDirVolumeSource{},
-									},
-								},
-							},
-						},
-					},
-					BackoffLimit: func(i int32) *int32 { return &i }(4),
-				},
-			}
-			// Set the ownerRef for the Job to ensure it gets cleaned up when the device is deleted
-			if err := ctrl.SetControllerReference(device, job, r.Scheme); err != nil {
-				return err
-			}
-			if err := r.CreateOrUpdate(ctx, job); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 // CreateOrUpdate creates or updates a resource
@@ -423,7 +510,7 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 		if err == nil {
 			return nil
 		}
-		if errors.IsConflict(err) {
+		if apierrors.IsConflict(err) {
 			// Fetch the latest version of the object
 			err = r.Get(ctx, key, existing)
 			if err != nil {
@@ -440,17 +527,11 @@ func (r *DeviceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object
 func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.Device{}).
-		// TODO Watch DevicesCluster, too (the sensors topic name can change)
-		// Watch for changes in the secret of the device
+		// Watch for changes in the class of the device
+		// TODO maybe better to watch for changes in the DeviceCluster
 		Watches(
-			&corev1.Secret{},
-			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		// Watch for changes in the firmware of the device
-		Watches(
-			&pedgev1alpha1.Firmware{},
-			handler.EnqueueRequestsFromMapFunc(r.findObjectsForFirmware),
+			&pedgev1alpha1.DeviceClass{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForDeviceClass),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		// Watch for changes in the service exposing the devices cluster
@@ -462,39 +543,13 @@ func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *DeviceReconciler) findObjectsForSecret(ctx context.Context, secret client.Object) []reconcile.Request {
+func (r *DeviceReconciler) findObjectsForDeviceClass(ctx context.Context, deviceClass client.Object) []reconcile.Request {
 	attachedDevices := &pedgev1alpha1.DeviceList{}
 	listOps := &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set{
-			secretNameLabel: secret.GetName(),
-		}),
-		Namespace: secret.GetNamespace(),
+		FieldSelector: fields.OneTermEqualSelector(".spec.deviceClassReference.name", deviceClass.GetName()),
+		Namespace:     deviceClass.GetNamespace(),
 	}
-	err := r.List(ctx, attachedDevices, listOps)
-	if err != nil {
-		return []reconcile.Request{}
-	}
-
-	requests := make([]reconcile.Request, len(attachedDevices.Items))
-	for i, item := range attachedDevices.Items {
-		requests[i] = reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      item.GetName(),
-				Namespace: item.GetNamespace(),
-			},
-		}
-	}
-	return requests
-}
-
-func (r *DeviceReconciler) findObjectsForFirmware(ctx context.Context, firmware client.Object) []reconcile.Request {
-	attachedDevices := &pedgev1alpha1.DeviceList{}
-	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(".spec.firmwareReference.name", firmware.GetName()),
-		Namespace:     firmware.GetNamespace(),
-	}
-	err := r.List(ctx, attachedDevices, listOps)
-	if err != nil {
+	if err := r.List(ctx, attachedDevices, listOps); err != nil {
 		return []reconcile.Request{}
 	}
 
@@ -516,8 +571,7 @@ func (r *DeviceReconciler) findObjectsForService(ctx context.Context, service cl
 		FieldSelector: fields.OneTermEqualSelector(".metadata.name", service.GetName()),
 		Namespace:     service.GetNamespace(),
 	}
-	err := r.List(ctx, attachedDevices, listOps)
-	if err != nil {
+	if err := r.List(ctx, attachedDevices, listOps); err != nil {
 		return []reconcile.Request{}
 	}
 

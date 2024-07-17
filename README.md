@@ -22,12 +22,12 @@ helm install influxdb-grafana oci://ghcr.io/plmercereau/pedge-charts/influxdb-gr
     --set=grafana.ingress.ingressClassName=traefik
 ```
 
+
 ### Install the Devices operator
 
 ```sh
 helm install devices-operator oci://ghcr.io/plmercereau/pedge-charts/devices-operator \
     --set=rabbitmq-operator.enabled=true \
-    --set=minio-operator.enabled=true
 ```
 
 ### Add a Devices cluster
@@ -35,7 +35,7 @@ helm install devices-operator oci://ghcr.io/plmercereau/pedge-charts/devices-ope
 ```sh
 kubectl apply -f - <<EOF
 apiVersion: devices.pedge.io/v1alpha1
-kind: DevicesCluster
+kind: DeviceCluster
 metadata:
   name: devices-cluster
 spec:

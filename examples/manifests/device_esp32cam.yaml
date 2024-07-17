@@ -1,0 +1,7 @@
+apiVersion: devices.pedge.io/v1alpha1
+kind: Device
+metadata:
+  name: esp32cam
+spec:
+  deviceClassReference:
+    name: esp32cam

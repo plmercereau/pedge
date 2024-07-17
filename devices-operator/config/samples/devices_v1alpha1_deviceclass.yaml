@@ -1,0 +1,17 @@
+apiVersion: devices.pedge.io/v1alpha1
+kind: DeviceClass
+metadata:
+  name: deviceclass-sample
+spec:
+  deviceClusterReference:
+    name: devices-cluster
+  builder:
+    image:
+      repository: ghcr.io/plmercereau/pedge/esp32-firmware-builder
+      tag: latest
+      pullPolicy: Always
+  config:
+    image:
+      repository: ghcr.io/plmercereau/pedge/esp32-config-builder
+      tag: latest
+      pullPolicy: Always

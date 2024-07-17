@@ -36,6 +36,8 @@ import (
 
 	devicesv1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	"github.com/plmercereau/pedge/internal/controller"
+	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
+	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -48,6 +50,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(devicesv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(rabbitmqv1.AddToScheme(scheme))
+	utilruntime.Must(rabbitmqtopologyv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -130,19 +134,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.DevicesClusterReconciler{
+	if err = (&controller.DeviceClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DevicesCluster")
+		setupLog.Error(err, "unable to create controller", "controller", "DeviceCluster")
 		os.Exit(1)
 	}
 
-	if err = (&controller.FirmwareReconciler{
+	if err = (&controller.DeviceClassReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Firmware")
+		setupLog.Error(err, "unable to create controller", "controller", "DeviceClass")
+		os.Exit(1)
+	}
+
+	if err = (&controller.DeviceSecretWatcherReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DeviceSecretWatcher")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

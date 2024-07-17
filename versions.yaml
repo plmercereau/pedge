@@ -1,10 +1,16 @@
-- name: firmware-builder-esp32-sim7600
-  dockerContext: firmware-builders/esp32-sim7600
-  version: 0.0.1
 - name: devices-operator
   dockerContext: devices-operator
   helmContext: charts/devices-operator
   version: 0.0.1
 - name: influxdb-grafana
   helmContext: charts/influxdb-grafana
+  version: 0.0.1
+- name: esp32-firmware-builder
+  dockerContext: services/esp32-firmware-builder
+  version: 0.0.1
+- name: esp32-config-builder
+  dockerContext: services/esp32-config-builder
+  version: 0.0.1
+- name: firmware-artefacts
+  dockerContext: services/firmware-artefacts
   version: 0.0.1
