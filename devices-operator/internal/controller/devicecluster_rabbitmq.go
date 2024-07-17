@@ -29,12 +29,6 @@ func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, devic
 			},
 			Rabbitmq: rabbitmqv1.RabbitmqClusterConfigurationSpec{
 				AdditionalPlugins: []rabbitmqv1.Plugin{"rabbitmq_mqtt"},
-				// TODO only for testing purposes
-				EnvConfig: `RABBITMQ_LOGS=""`,
-				AdditionalConfig: `
-log.console = true
-log.console.level = debug
-`,
 			},
 		},
 	}

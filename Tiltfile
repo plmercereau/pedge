@@ -23,7 +23,6 @@ k8s_yaml(helm('./charts/influxdb-grafana', values=['./charts/influxdb-grafana/va
 
 docker_build('ghcr.io/plmercereau/pedge/devices-operator:0.0.1', './devices-operator')
 
-# TODO watch files
 k8s_kind('DeviceClass', image_object={'json_path': '{.spec.builder.image}', 'repo_field': 'repository', 'tag_field': 'tag'})
 docker_build('ghcr.io/plmercereau/pedge/esp32-firmware-builder:latest', './services/esp32-firmware-builder')
 

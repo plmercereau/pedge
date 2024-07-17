@@ -25,7 +25,7 @@ func jobSpecMatches(existingJob, newJob *batchv1.Job) bool {
 	// Return true if they match, false otherwise
 
 	// For simplicity, we just check labels and some key fields here
-	// TODO check other stuff
+	// TODO implement a better way to compare job specs
 	if !equalMaps(existingJob.Labels, newJob.Labels) ||
 		// (existingJob.Annotations[secretHashAnnotation] != newJob.Annotations[secretHashAnnotation]) ||
 		existingJob.Spec.Template.Spec.RestartPolicy != newJob.Spec.Template.Spec.RestartPolicy ||
