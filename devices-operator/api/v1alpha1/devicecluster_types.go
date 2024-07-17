@@ -40,8 +40,6 @@ type InfluxDB struct {
 type DeviceClusterSpec struct {
 	Artefacts ArtefactsSpec `json:"artefacts,omitempty"`
 	// +kubebuilder:validation:Required
-	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
-	// +kubebuilder:validation:Required
 	MQTT MQTTSpec `json:"mqtt"`
 	// +kubebuilder:validation:Optional
 	InfluxDB InfluxDB `json:"influxdb"`

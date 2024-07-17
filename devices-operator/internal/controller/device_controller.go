@@ -337,7 +337,6 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 					},
 					Containers: []corev1.Container{
 						// Use a persistent volume to store the firmware
-						// TODO add an .htpasswd file to secure the access to the file
 						{
 							Name:  "upload-secret",
 							Image: "busybox:1.36.1",
@@ -374,7 +373,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 							Name: storageMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: deviceCluster.Spec.PersistentVolumeClaimName,
+									ClaimName: deviceCluster.Name + artefactSuffix,
 								},
 							},
 						},

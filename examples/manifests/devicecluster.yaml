@@ -3,7 +3,6 @@ kind: DeviceCluster
 metadata:
   name: my-cluster
 spec:
-  persistentVolumeClaimName: devices
   artefacts:
     image:
       repository: ghcr.io/plmercereau/pedge/firmware-artefacts

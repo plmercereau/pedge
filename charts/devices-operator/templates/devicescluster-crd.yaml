@@ -66,8 +66,6 @@ spec:
                   sensorsTopic:
                     type: string
                 type: object
-              persistentVolumeClaimName:
-                type: string
             required:
             - mqtt
             type: object

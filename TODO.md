@@ -1,4 +1,3 @@
-- include pvc/pv in the operator
 - Include the lilygo code into the new esp32 firmware builder
 - rebuild devices configs when the hostname/port/sensor topic changes
 - DeviceGroup

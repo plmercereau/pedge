@@ -13,27 +13,27 @@ import (
 )
 
 const (
-	artefactServiceSuffix = "-artefacts"
+	artefactSuffix = "-artefacts"
 )
 
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 
-func (r *DeviceClusterReconciler) syncHttpServer(ctx context.Context, server *pedgev1alpha1.DeviceCluster) error {
-	artefactsServiceImage := server.Spec.Artefacts.Image
+func (r *DeviceClusterReconciler) syncHttpServer(ctx context.Context, deviceCluster *pedgev1alpha1.DeviceCluster) error {
+	artefactsServiceImage := deviceCluster.Spec.Artefacts.Image
 	replicasValue := int32(1)
 	containerPort := int32(5000)
-	volumeName := server.Name + "-data"
-	labels := map[string]string{"app": server.Name}
+	volumeName := deviceCluster.Name + "-data"
+	labels := map[string]string{"app": deviceCluster.Name}
 	labelSelector := metav1.LabelSelector{MatchLabels: labels}
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name + artefactServiceSuffix,
-			Namespace: server.Namespace,
+			Name:      deviceCluster.Name + artefactSuffix,
+			Namespace: deviceCluster.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
+				*metav1.NewControllerRef(deviceCluster, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -46,7 +46,7 @@ func (r *DeviceClusterReconciler) syncHttpServer(ctx context.Context, server *pe
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  server.Name,
+							Name:  deviceCluster.Name,
 							Image: fmt.Sprintf("%s:%s", artefactsServiceImage.Repository, artefactsServiceImage.Tag),
 							Ports: []corev1.ContainerPort{
 								{
@@ -70,7 +70,7 @@ func (r *DeviceClusterReconciler) syncHttpServer(ctx context.Context, server *pe
 							Name: volumeName,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "devices", // server.Name + "-data", // TODO
+									ClaimName: deviceCluster.Name + artefactSuffix,
 								},
 							},
 						},
@@ -83,10 +83,10 @@ func (r *DeviceClusterReconciler) syncHttpServer(ctx context.Context, server *pe
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name + artefactServiceSuffix,
-			Namespace: server.Namespace,
+			Name:      deviceCluster.Name + artefactSuffix,
+			Namespace: deviceCluster.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
+				*metav1.NewControllerRef(deviceCluster, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -108,20 +108,20 @@ func (r *DeviceClusterReconciler) syncHttpServer(ctx context.Context, server *pe
 		return err
 	}
 
-	if server.Spec.Artefacts.Ingress.Enabled {
+	if deviceCluster.Spec.Artefacts.Ingress.Enabled {
 		pathTypePrefix := networkingv1.PathTypePrefix
 		ingress := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      server.Name,
-				Namespace: server.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 				OwnerReferences: []metav1.OwnerReference{
-					*metav1.NewControllerRef(server, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
+					*metav1.NewControllerRef(deviceCluster, pedgev1alpha1.GroupVersion.WithKind("DeviceCluster")),
 				},
 			},
 			Spec: networkingv1.IngressSpec{
 				Rules: []networkingv1.IngressRule{
 					{
-						Host: server.Spec.Artefacts.Ingress.Hostname,
+						Host: deviceCluster.Spec.Artefacts.Ingress.Hostname,
 						IngressRuleValue: networkingv1.IngressRuleValue{
 							HTTP: &networkingv1.HTTPIngressRuleValue{
 								Paths: []networkingv1.HTTPIngressPath{
@@ -130,7 +130,7 @@ func (r *DeviceClusterReconciler) syncHttpServer(ctx context.Context, server *pe
 										PathType: &pathTypePrefix,
 										Backend: networkingv1.IngressBackend{
 											Service: &networkingv1.IngressServiceBackend{
-												Name: server.Name + artefactServiceSuffix,
+												Name: deviceCluster.Name + artefactSuffix,
 												Port: networkingv1.ServiceBackendPort{
 													Number: 80,
 												},

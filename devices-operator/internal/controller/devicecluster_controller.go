@@ -39,10 +39,9 @@ type DeviceClusterReconciler struct {
 
 func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	// TODO rename 'server' to 'deviceCluster'
 	// Fetch the DeviceCluster instance
-	server := &pedgev1alpha1.DeviceCluster{}
-	err := r.Get(ctx, req.NamespacedName, server)
+	deviceCluster := &pedgev1alpha1.DeviceCluster{}
+	err := r.Get(ctx, req.NamespacedName, deviceCluster)
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			return ctrl.Result{}, nil
@@ -51,12 +50,15 @@ func (r *DeviceClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// Sync resources
-	if err := r.syncRabbitmqCluster(ctx, server); err != nil {
+	if err := r.ensurePersistence(ctx, deviceCluster); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := r.syncHttpServer(ctx, server); err != nil {
+	if err := r.syncRabbitmqCluster(ctx, deviceCluster); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.syncHttpServer(ctx, deviceCluster); err != nil {
 		return ctrl.Result{}, err
 	}
 

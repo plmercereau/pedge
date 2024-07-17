@@ -16,12 +16,12 @@ import (
 )
 
 // syncResources creates or updates the associated resources
-func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, server *pedgev1alpha1.DeviceCluster) error {
+func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, deviceCluster *pedgev1alpha1.DeviceCluster) error {
 	// Define the desired RabbitMQ Cluster resource
 	cluster := &rabbitmqv1.RabbitmqCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name,
-			Namespace: server.Namespace,
+			Name:      deviceCluster.Name,
+			Namespace: deviceCluster.Namespace,
 		},
 		Spec: rabbitmqv1.RabbitmqClusterSpec{
 			Service: rabbitmqv1.RabbitmqClusterServiceSpec{
@@ -39,24 +39,24 @@ log.console.level = debug
 		},
 	}
 
-	if err := controllerutil.SetOwnerReference(server, cluster, r.Scheme); err != nil {
+	if err := controllerutil.SetOwnerReference(deviceCluster, cluster, r.Scheme); err != nil {
 		return err
 	}
 
 	vhost := &rabbitmqtopologyv1.Vhost{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name + "-default",
-			Namespace: server.Namespace,
+			Name:      deviceCluster.Name + "-default",
+			Namespace: deviceCluster.Namespace,
 		},
 		Spec: rabbitmqtopologyv1.VhostSpec{
 			Name: "/",
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      server.Name,
-				Namespace: server.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
-	if err := controllerutil.SetOwnerReference(server, vhost, r.Scheme); err != nil {
+	if err := controllerutil.SetOwnerReference(deviceCluster, vhost, r.Scheme); err != nil {
 		return err
 	}
 	// We only create the vhost if it doesn't exist. The RabbitMQ messaging topology operator does not allow to modify it.
@@ -70,19 +70,19 @@ log.console.level = debug
 
 	queue := &rabbitmqtopologyv1.Queue{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      server.Name,
-			Namespace: server.Namespace,
+			Name:      deviceCluster.Name,
+			Namespace: deviceCluster.Namespace,
 		},
 		Spec: rabbitmqtopologyv1.QueueSpec{
-			Name:  server.Spec.MQTT.SensorsTopic,
+			Name:  deviceCluster.Spec.MQTT.SensorsTopic,
 			Vhost: vhost.Name,
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      server.Name,
-				Namespace: server.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
-	if err := controllerutil.SetOwnerReference(server, queue, r.Scheme); err != nil {
+	if err := controllerutil.SetOwnerReference(deviceCluster, queue, r.Scheme); err != nil {
 		return err
 	}
 
@@ -96,11 +96,11 @@ log.console.level = debug
 
 	var listenerSecret corev1.Secret
 	secretName := listenerUserName + deviceSecretSuffix
-	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: server.Namespace}, &listenerSecret); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: deviceCluster.Namespace}, &listenerSecret); err != nil {
 		listenerSecret = corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,
-				Namespace: server.Namespace,
+				Namespace: deviceCluster.Namespace,
 			},
 			Data: map[string][]byte{
 				"username": []byte(listenerUserName),
@@ -121,9 +121,9 @@ log.console.level = debug
 	}
 
 	// Store MQTT URL/TOPIC/USERNAME/PASSWORD in influxdb-auth in the influxdb namespace
-	if server.Spec.InfluxDB != (pedgev1alpha1.InfluxDB{}) {
+	if deviceCluster.Spec.InfluxDB != (pedgev1alpha1.InfluxDB{}) {
 		influxDBSecret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Name: server.Spec.InfluxDB.SecretReference.Name, Namespace: server.Spec.InfluxDB.Namespace}, influxDBSecret); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: deviceCluster.Spec.InfluxDB.SecretReference.Name, Namespace: deviceCluster.Spec.InfluxDB.Namespace}, influxDBSecret); err != nil {
 			// If a secret name is provided, then it must exist
 			// TODO in such cases, create an Event for the user to understand why their reconcile is failing.
 			return err
@@ -149,11 +149,11 @@ log.console.level = debug
 			influxDBSecret.Data["MQTT_PASSWORD"] = listenerSecret.Data["password"]
 			changed = true
 		}
-		if influxDBSecret.Data["MQTT_TOPIC"] == nil || string(influxDBSecret.Data["MQTT_TOPIC"]) != server.Spec.MQTT.SensorsTopic {
-			influxDBSecret.Data["MQTT_TOPIC"] = []byte(server.Spec.MQTT.SensorsTopic)
+		if influxDBSecret.Data["MQTT_TOPIC"] == nil || string(influxDBSecret.Data["MQTT_TOPIC"]) != deviceCluster.Spec.MQTT.SensorsTopic {
+			influxDBSecret.Data["MQTT_TOPIC"] = []byte(deviceCluster.Spec.MQTT.SensorsTopic)
 			changed = true
 		}
-		mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", server.Name, server.Namespace, "1883")
+		mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", deviceCluster.Name, deviceCluster.Namespace, "1883")
 		if influxDBSecret.Data["MQTT_URL"] == nil || string(influxDBSecret.Data["MQTT_URL"]) != mqttUrl {
 			influxDBSecret.Data["MQTT_URL"] = []byte(mqttUrl)
 			changed = true
@@ -173,7 +173,7 @@ log.console.level = debug
 	listenerUser := &rabbitmqtopologyv1.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      listenerUserName,
-			Namespace: server.Namespace,
+			Namespace: deviceCluster.Namespace,
 			Annotations: map[string]string{
 				// Needed to trigger a reconciliation when the password changes
 				secretVersionAnnotation: listenerSecret.GetResourceVersion(),
@@ -181,17 +181,17 @@ log.console.level = debug
 		},
 		Spec: rabbitmqtopologyv1.UserSpec{
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      server.Name,
-				Namespace: server.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 			ImportCredentialsSecret: &corev1.LocalObjectReference{
 				Name: listenerSecret.Name,
 			},
 		},
 	}
-	// TODO it seems rabbitmq is already watching/owning the user, and when set to server, the permissions are not applied
+	// TODO it seems rabbitmq is already watching/owning the user, and when set to deviceCluster, the permissions are not applied
 	// For now, accept users are not deleted with the devices cluster...
-	// controllerutil.SetOwnerReference(server, listenerUser, r.Scheme)
+	// controllerutil.SetOwnerReference(deviceCluster, listenerUser, r.Scheme)
 
 	// Define the desired RabbitMQ Permission resource
 	listenerPermission := &rabbitmqtopologyv1.Permission{
@@ -210,12 +210,12 @@ log.console.level = debug
 				Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      server.Name,
-				Namespace: server.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
-	// controllerutil.SetOwnerReference(server, listenerPermission, r.Scheme)
+	// controllerutil.SetOwnerReference(deviceCluster, listenerPermission, r.Scheme)
 
 	// Define the desired RabbitMQ TopicPermission resource
 	listenerTopicPermission := &rabbitmqtopologyv1.TopicPermission{
@@ -231,15 +231,15 @@ log.console.level = debug
 			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
 				Exchange: "amq.topic",
 				Write:    "",
-				Read:     fmt.Sprintf("^%s\\..+$", server.Spec.MQTT.SensorsTopic),
+				Read:     fmt.Sprintf("^%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic),
 			},
 			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      server.Name,
-				Namespace: server.Namespace,
+				Name:      deviceCluster.Name,
+				Namespace: deviceCluster.Namespace,
 			},
 		},
 	}
-	// controllerutil.SetOwnerReference(server, listenerTopicPermission, r.Scheme)
+	// controllerutil.SetOwnerReference(deviceCluster, listenerTopicPermission, r.Scheme)
 
 	resources := []client.Object{cluster, listenerUser, listenerPermission, listenerTopicPermission}
 	for _, res := range resources {

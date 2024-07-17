@@ -109,7 +109,7 @@ func (r *DeviceClassReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 							Name: storageMount.Name,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: deviceCluster.Spec.PersistentVolumeClaimName,
+									ClaimName: deviceCluster.Name + artefactSuffix,
 								},
 							},
 						},
