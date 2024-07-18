@@ -13,10 +13,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // syncResources creates or updates the associated resources
 func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, deviceCluster *pedgev1alpha1.DeviceCluster) error {
+	logger := log.FromContext(ctx)
 	// Define the desired RabbitMQ Cluster resource
 	cluster := &rabbitmqv1.RabbitmqCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -34,6 +36,10 @@ func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, devic
 	}
 
 	if err := controllerutil.SetOwnerReference(deviceCluster, cluster, r.Scheme); err != nil {
+		return err
+	}
+
+	if err := r.CreateOrUpdate(ctx, cluster); err != nil {
 		return err
 	}
 
@@ -88,158 +94,184 @@ func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, devic
 		}
 	}
 
-	var listenerSecret corev1.Secret
-	secretName := listenerUserName + deviceSecretSuffix
-	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: deviceCluster.Namespace}, &listenerSecret); err != nil {
-		listenerSecret = corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: deviceCluster.Namespace,
-			},
-			Data: map[string][]byte{
-				"username": []byte(listenerUserName),
-				"password": []byte(generateRandomPassword(16)),
-			},
-		}
+	if deviceCluster.Spec.MQTT.Users != nil {
+		// loop on users
+		for _, user := range deviceCluster.Spec.MQTT.Users {
+			var userSecret corev1.Secret
+			secretName := user.Name + deviceSecretSuffix
+			if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: deviceCluster.Namespace}, &userSecret); err != nil {
+				userSecret = corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretName,
+						Namespace: deviceCluster.Namespace,
+					},
+					Data: map[string][]byte{
+						"username": []byte(user.Name),
+						"password": []byte(generateRandomPassword(16)),
+					},
+				}
 
-		if err := r.Create(ctx, &listenerSecret); err != nil {
-			return err
-		}
-	} else {
-		if string(listenerSecret.Data["username"]) != listenerUserName {
-			listenerSecret.Data["username"] = []byte(listenerUserName)
-			if err := r.Update(ctx, &listenerSecret); err != nil {
-				return err
+				if err := r.Create(ctx, &userSecret); err != nil {
+					return err
+				}
+			} else {
+				changed := false
+				if _, exists := userSecret.Data["username"]; !exists {
+					userSecret.Data["username"] = []byte(user.Name)
+					changed = true
+				}
+				if _, exists := userSecret.Data["password"]; !exists {
+					userSecret.Data["password"] = []byte(generateRandomPassword(16))
+					changed = true
+				}
+				if changed {
+					if err := r.Update(ctx, &userSecret); err != nil {
+						return err
+					}
+
+				}
 			}
-		}
-	}
 
-	// Store MQTT URL/TOPIC/USERNAME/PASSWORD in influxdb-auth in the influxdb namespace
-	if deviceCluster.Spec.InfluxDB != (pedgev1alpha1.InfluxDB{}) {
-		influxDBSecret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Name: deviceCluster.Spec.InfluxDB.SecretReference.Name, Namespace: deviceCluster.Spec.InfluxDB.Namespace}, influxDBSecret); err != nil {
-			// If a secret name is provided, then it must exist
-			// TODO in such cases, create an Event for the user to understand why their reconcile is failing.
-			return err
-		}
-
-		changed := false
-
-		// Add reloader.stakater.com/match: "true" to the secret to trigger a reload of the telegraf config
-		if influxDBSecret.Annotations == nil {
-			influxDBSecret.Annotations = make(map[string]string)
-			// check if reloader.stakater.com/match exists and is set to "true"
-			if influxDBSecret.Annotations["reloader.stakater.com/match"] != "true" {
-				influxDBSecret.Annotations["reloader.stakater.com/match"] = "true"
-				changed = true
+			rabbitmqUser := &rabbitmqtopologyv1.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      user.Name,
+					Namespace: deviceCluster.Namespace,
+					Annotations: map[string]string{
+						// Needed to trigger a reconciliation when the password changes
+						secretVersionAnnotation: userSecret.GetResourceVersion(),
+					},
+				},
+				Spec: rabbitmqtopologyv1.UserSpec{
+					RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
+						Name:      deviceCluster.Name,
+						Namespace: deviceCluster.Namespace,
+					},
+					ImportCredentialsSecret: &corev1.LocalObjectReference{
+						Name: userSecret.Name,
+					},
+				},
 			}
-		}
+			// TODO it seems rabbitmq is already watching/owning the user, and when set to deviceCluster, the permissions are not applied
+			// For now, accept users are not deleted with the devices cluster...
+			// controllerutil.SetOwnerReference(deviceCluster, listenerUser, r.Scheme)
 
-		if influxDBSecret.Data["MQTT_USERNAME"] == nil || string(influxDBSecret.Data["MQTT_USERNAME"]) != listenerUserName {
-			influxDBSecret.Data["MQTT_USERNAME"] = []byte(listenerUserName)
-			changed = true
-		}
-		if influxDBSecret.Data["MQTT_PASSWORD"] == nil || string(influxDBSecret.Data["MQTT_PASSWORD"]) != string(listenerSecret.Data["password"]) {
-			influxDBSecret.Data["MQTT_PASSWORD"] = listenerSecret.Data["password"]
-			changed = true
-		}
-		if influxDBSecret.Data["MQTT_TOPIC"] == nil || string(influxDBSecret.Data["MQTT_TOPIC"]) != deviceCluster.Spec.MQTT.SensorsTopic {
-			influxDBSecret.Data["MQTT_TOPIC"] = []byte(deviceCluster.Spec.MQTT.SensorsTopic)
-			changed = true
-		}
-		mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", deviceCluster.Name, deviceCluster.Namespace, "1883")
-		if influxDBSecret.Data["MQTT_URL"] == nil || string(influxDBSecret.Data["MQTT_URL"]) != mqttUrl {
-			influxDBSecret.Data["MQTT_URL"] = []byte(mqttUrl)
-			changed = true
-		}
-		// ! For some reason, telegraf does not allow admin-token as an environment variable, maybe because of the dash
-		if influxDBSecret.Data["INFLUXDB_TOKEN"] == nil || string(influxDBSecret.Data["INFLUXDB_TOKEN"]) != string(influxDBSecret.Data["admin-token"]) {
-			influxDBSecret.Data["INFLUXDB_TOKEN"] = influxDBSecret.Data["admin-token"]
-			changed = true
-		}
-		if changed {
-			if err := r.Update(ctx, influxDBSecret); err != nil {
-				return err
+			// Define the desired RabbitMQ Permission resource
+			userPermission := &rabbitmqtopologyv1.Permission{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      user.Name,
+					Namespace: rabbitmqUser.Namespace,
+				},
+				Spec: rabbitmqtopologyv1.PermissionSpec{
+					Vhost: "/",
+					UserReference: &corev1.LocalObjectReference{
+						Name: user.Name,
+					},
+					Permissions: rabbitmqtopologyv1.VhostPermissions{
+						Configure: "^mqtt-subscription-.*$",
+						Write:     "^amq\\.topic$|^mqtt-subscription-.*$",
+						Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
+					},
+					RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
+						Name:      deviceCluster.Name,
+						Namespace: deviceCluster.Namespace,
+					},
+				},
 			}
+			// controllerutil.SetOwnerReference(deviceCluster, listenerPermission, r.Scheme)
+
+			// Define the desired RabbitMQ TopicPermission resource
+			// ! For now, we only support the "reader" role
+			if user.Role != "reader" {
+				return fmt.Errorf("Role %s is not supported", user.Role)
+			}
+			userTopicPermission := &rabbitmqtopologyv1.TopicPermission{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      user.Name,
+					Namespace: rabbitmqUser.Namespace,
+				},
+				Spec: rabbitmqtopologyv1.TopicPermissionSpec{
+					Vhost: "/",
+					UserReference: &corev1.LocalObjectReference{
+						Name: user.Name,
+					},
+					Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
+						Exchange: "amq.topic",
+						Write:    "",
+						Read:     fmt.Sprintf("^%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic),
+					},
+					RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
+						Name:      deviceCluster.Name,
+						Namespace: deviceCluster.Namespace,
+					},
+				},
+			}
+			// controllerutil.SetOwnerReference(deviceCluster, listenerTopicPermission, r.Scheme)
+			resources := []client.Object{rabbitmqUser, userPermission, userTopicPermission}
+			for _, res := range resources {
+				if err := r.CreateOrUpdate(ctx, res); err != nil {
+					return err
+				}
+			}
+
+			for _, inject := range user.InjectSecrets {
+				remoteSecret := &corev1.Secret{}
+				if err := r.Get(ctx, types.NamespacedName{Name: inject.Name, Namespace: inject.Namespace}, remoteSecret); err != nil {
+					// If a secret name is provided, then it must exist
+					// TODO in such cases, create an Event for the user to understand why their reconcile is failing.
+					// TODO also create an option "createIfNotExists" to create the secret if it does not exist
+					logger.Error(err, "Secret injection: failed to get secret", "name", inject.Name, "namespace", inject.Namespace)
+					return err
+				}
+
+				changed := false
+				if inject.Annotations != nil {
+					// Add reloader.stakater.com/match: "true" to the secret to trigger a reload of the telegraf config
+					if remoteSecret.Annotations == nil {
+						remoteSecret.Annotations = make(map[string]string)
+						changed = true
+					}
+					for key, value := range inject.Annotations {
+						if remoteSecret.Annotations[key] != value {
+							remoteSecret.Annotations[key] = value
+							changed = true
+						}
+					}
+				}
+
+				usernameKey := inject.Mapping.Username
+				if remoteSecret.Data[usernameKey] == nil || string(remoteSecret.Data[usernameKey]) != user.Name {
+					remoteSecret.Data[usernameKey] = []byte(user.Name)
+					changed = true
+				}
+				passwordKey := inject.Mapping.Password
+				if remoteSecret.Data[passwordKey] == nil || string(remoteSecret.Data[passwordKey]) != string(userSecret.Data["password"]) {
+					remoteSecret.Data[passwordKey] = userSecret.Data["password"]
+					changed = true
+				}
+				sensorsTopicKey := inject.Mapping.SensorsTopic
+				if sensorsTopicKey != "" {
+					if remoteSecret.Data[sensorsTopicKey] == nil || string(remoteSecret.Data[sensorsTopicKey]) != deviceCluster.Spec.MQTT.SensorsTopic {
+						remoteSecret.Data[sensorsTopicKey] = []byte(deviceCluster.Spec.MQTT.SensorsTopic)
+						changed = true
+					}
+				}
+				brokerUrlKey := inject.Mapping.BrokerUrl
+				if brokerUrlKey != "" {
+					mqttUrl := fmt.Sprintf("tcp://%s.%s.svc:%s", deviceCluster.Name, deviceCluster.Namespace, "1883")
+					if remoteSecret.Data[brokerUrlKey] == nil || string(remoteSecret.Data[brokerUrlKey]) != mqttUrl {
+						remoteSecret.Data[brokerUrlKey] = []byte(mqttUrl)
+						changed = true
+					}
+				}
+				if changed {
+					if err := r.Update(ctx, remoteSecret); err != nil {
+						return err
+					}
+				}
+			}
+
 		}
 	}
 
-	listenerUser := &rabbitmqtopologyv1.User{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      listenerUserName,
-			Namespace: deviceCluster.Namespace,
-			Annotations: map[string]string{
-				// Needed to trigger a reconciliation when the password changes
-				secretVersionAnnotation: listenerSecret.GetResourceVersion(),
-			},
-		},
-		Spec: rabbitmqtopologyv1.UserSpec{
-			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      deviceCluster.Name,
-				Namespace: deviceCluster.Namespace,
-			},
-			ImportCredentialsSecret: &corev1.LocalObjectReference{
-				Name: listenerSecret.Name,
-			},
-		},
-	}
-	// TODO it seems rabbitmq is already watching/owning the user, and when set to deviceCluster, the permissions are not applied
-	// For now, accept users are not deleted with the devices cluster...
-	// controllerutil.SetOwnerReference(deviceCluster, listenerUser, r.Scheme)
-
-	// Define the desired RabbitMQ Permission resource
-	listenerPermission := &rabbitmqtopologyv1.Permission{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      listenerUser.Name,
-			Namespace: listenerUser.Namespace,
-		},
-		Spec: rabbitmqtopologyv1.PermissionSpec{
-			Vhost: "/",
-			UserReference: &corev1.LocalObjectReference{
-				Name: listenerUser.Name,
-			},
-			Permissions: rabbitmqtopologyv1.VhostPermissions{
-				Configure: "^mqtt-subscription-.*$",
-				Write:     "^amq\\.topic$|^mqtt-subscription-.*$",
-				Read:      "^amq\\.topic$|^mqtt-subscription-.*$",
-			},
-			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      deviceCluster.Name,
-				Namespace: deviceCluster.Namespace,
-			},
-		},
-	}
-	// controllerutil.SetOwnerReference(deviceCluster, listenerPermission, r.Scheme)
-
-	// Define the desired RabbitMQ TopicPermission resource
-	listenerTopicPermission := &rabbitmqtopologyv1.TopicPermission{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      listenerUser.Name,
-			Namespace: listenerUser.Namespace,
-		},
-		Spec: rabbitmqtopologyv1.TopicPermissionSpec{
-			Vhost: "/",
-			UserReference: &corev1.LocalObjectReference{
-				Name: listenerUser.Name,
-			},
-			Permissions: rabbitmqtopologyv1.TopicPermissionConfig{
-				Exchange: "amq.topic",
-				Write:    "",
-				Read:     fmt.Sprintf("^%s\\..+$", deviceCluster.Spec.MQTT.SensorsTopic),
-			},
-			RabbitmqClusterReference: rabbitmqtopologyv1.RabbitmqClusterReference{
-				Name:      deviceCluster.Name,
-				Namespace: deviceCluster.Namespace,
-			},
-		},
-	}
-	// controllerutil.SetOwnerReference(deviceCluster, listenerTopicPermission, r.Scheme)
-
-	resources := []client.Object{cluster, listenerUser, listenerPermission, listenerTopicPermission}
-	for _, res := range resources {
-		if err := r.CreateOrUpdate(ctx, res); err != nil {
-			return err
-		}
-	}
 	return nil
 }

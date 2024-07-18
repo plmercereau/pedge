@@ -40,6 +40,18 @@ telegraf:
   # Get the config from influxdb-auth secret, that is be updated by the operator with MQTT credentials and details
   # That way, we don't need influxdb/grafana to be in the same namespace as rabbitmq
   envFromSecret: influxdb-auth
+  # The influxdb credentials are not posix-compliant (contain a dash), so we need to use envFromSecret
+  env:
+    - name: INFLUXDB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: influxdb-auth
+          key: admin-token
+    - name: INFLUXDB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: influxdb-auth
+          key: admin-password
   podAnnotations:
     reloader.stakater.com/search: "true"
 
@@ -70,11 +82,11 @@ telegraf:
           percentile_limit: 1000
       - mqtt_consumer:
           servers:
-            - "${MQTT_URL}"
+            - "${MQTT_BROKER_URL}"
           username: "${MQTT_USERNAME}"
           password: "${MQTT_PASSWORD}"
           topics:
-            - "${MQTT_TOPIC}/+/coordinates"
+            - "${MQTT_TOPIC_SENSORS}/+/coordinates"
           data_format: "json_v2"
           json_v2:
             - measurement_name: coordinates
@@ -87,7 +99,7 @@ telegraf:
                       rename: longitude
 
           topic_parsing:
-            - topic: "${MQTT_TOPIC}/+/coordinates"
+            - topic: "${MQTT_TOPIC_SENSORS}/+/coordinates"
               # measurement: "_/_/measurement"
               tags: "_/device/_"
               #fields: "_/_/_"

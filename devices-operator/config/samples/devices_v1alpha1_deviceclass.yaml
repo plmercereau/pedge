@@ -1,3 +1,4 @@
+# ! this example is not up to date
 apiVersion: devices.pedge.io/v1alpha1
 kind: DeviceClass
 metadata:

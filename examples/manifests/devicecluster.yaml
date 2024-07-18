@@ -14,8 +14,17 @@ spec:
     # hostname: mqtt.example.com
     # port: 1883
     sensorsTopic: sensors
-  influxdb:
-    # name: influxdb
-    namespace: default
-    secretReference:
-      name: influxdb-auth
+    users:
+      - name: device-listener
+        role: reader
+        injectSecrets:
+          - name: influxdb-auth
+            namespace: default
+            mapping:
+              brokerUrl: MQTT_BROKER_URL
+              username: MQTT_USERNAME
+              password: MQTT_PASSWORD
+              sensorsTopic: MQTT_TOPIC_SENSORS
+            # Add reloader.stakater.com/match: "true" to the secret to trigger a reload of the telegraf config
+            annotations:
+              "reloader.stakater.com/match": "true"

@@ -5,22 +5,15 @@ import (
 	"fmt"
 
 	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
-	listenerUserName        = "device-listener"
 	secretVersionAnnotation = "pedge.io/secret-version"
 )
 
@@ -99,34 +92,5 @@ func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client
 func (r *DeviceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pedgev1alpha1.DeviceCluster{}).
-		Watches(
-			&corev1.Secret{},
-			handler.EnqueueRequestsFromMapFunc(r.findObjectsForInfluxSecret),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
 		Complete(r)
-}
-
-func (r *DeviceClusterReconciler) findObjectsForInfluxSecret(ctx context.Context, secret client.Object) []reconcile.Request {
-	attachedDevices := &pedgev1alpha1.DeviceClassList{}
-	listOps := &client.ListOptions{
-		FieldSelector: fields.AndSelectors(
-			fields.OneTermEqualSelector(".spec.influxDB.secretReference.name", secret.GetName()),
-			fields.OneTermEqualSelector(".spec.influxDB.namespace", secret.GetNamespace())),
-	}
-	err := r.List(ctx, attachedDevices, listOps)
-	if err != nil {
-		return []reconcile.Request{}
-	}
-
-	requests := make([]reconcile.Request, len(attachedDevices.Items))
-	for i, item := range attachedDevices.Items {
-		requests[i] = reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      item.GetName(),
-				Namespace: item.GetNamespace(),
-			},
-		}
-	}
-	return requests
 }

@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,14 +22,42 @@ type MQTTSpec struct {
 	// +kubebuilder:validation:Optional
 	Hostname string `json:"hostname,omitempty"`
 	// +kubebuilder:validation:Optional
-	Port int32 `json:"port,omitempty"`
+	Port  int32      `json:"port,omitempty"`
+	Users []MQTTUser `json:"users,omitempty"`
 }
 
-type InfluxDB struct {
+type SecretInjectionMapping struct {
 	// +kubebuilder:validation:Required
-	Namespace string `json:"namespace,omitempty"` // TODO add default value through a webhook
+	Username string `json:"username,omitempty"`
 	// +kubebuilder:validation:Required
-	SecretReference corev1.LocalObjectReference `json:"secretReference,omitempty"` // TODO default to influxdb-auth
+	Password string `json:"password,omitempty"`
+	// +kubebuilder:validation:Optional
+	SensorsTopic string `json:"sensorsTopic,omitempty"`
+	// +kubebuilder:validation:Optional
+	BrokerUrl string `json:"brokerUrl,omitempty"`
+}
+
+type SecretInjection struct {
+	// name is unique within a namespace to reference a secret resource.
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	// namespace defines the space within which the secret name must be unique.
+	// +optional
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
+	// +kubebuilder:validation:Required
+	Mapping SecretInjectionMapping `json:"mapping,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default []
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type MQTTUser struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name,omitempty"`
+	// +kubebuilder:validation:Required
+	Role string `json:"role,omitempty"`
+	// +kubebuilder:validation:Optional
+	InjectSecrets []SecretInjection `json:"injectSecrets,omitempty"`
 }
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -41,8 +68,6 @@ type DeviceClusterSpec struct {
 	Artefacts ArtefactsSpec `json:"artefacts,omitempty"`
 	// +kubebuilder:validation:Required
 	MQTT MQTTSpec `json:"mqtt"`
-	// +kubebuilder:validation:Optional
-	InfluxDB InfluxDB `json:"influxdb"`
 }
 
 // DeviceClusterStatus defines the observed state of DeviceCluster

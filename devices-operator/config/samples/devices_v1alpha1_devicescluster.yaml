@@ -1,3 +1,4 @@
+# ! this example is not up to date
 apiVersion: devices.pedge.io/v1alpha1
 kind: DeviceCluster
 metadata:
@@ -5,8 +6,3 @@ metadata:
 spec:
   mqtt:
     sensorsTopic: sensors
-  influxdb:
-    # name: influxdb
-    namespace: default
-    secretReference:
-      name: influxdb-auth
