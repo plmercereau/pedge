@@ -1,11 +1,4 @@
 - Include the lilygo code into the new esp32 firmware builder
-- DeviceGroup
-  - used for loading common settings e.g. wifi settings
-  - use a selector e.g. on labels
-    - the selector would then be used to mount the secret in the config builder
-      - device > device group > device class > devices cluster
-      - think of another label to sort device groups e.g. `priority`
-  - `spec.secret.name`
 - develop a rancher UI interface
 
   - CRUD devices
@@ -16,6 +9,13 @@
 
 ## Backlog
 
+- DeviceGroup
+  - used for loading common settings e.g. wifi settings
+  - use a selector e.g. on labels
+    - the selector would then be used to mount the secret in the config builder
+      - device > device group > device class > devices cluster
+      - think of another label to sort device groups e.g. `priority`
+  - `spec.secret.name`
 - validation/default hooks
 - implement the firmware build job in the same spirit as the config builder job
 - device sensors

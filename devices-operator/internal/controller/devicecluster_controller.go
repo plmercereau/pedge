@@ -3,13 +3,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
@@ -23,6 +21,7 @@ import (
 )
 
 const (
+	deviceClusterSecretSuffix    = "-device-cluster"
 	secretVersionAnnotation      = "pedge.io/secret-version"
 	mqttBrokerHostnameAnnotation = "pedge.io/mqtt-broker-hostname"
 	mqttBrokerPortAnnotation     = "pedge.io/mqtt-broker-port"
@@ -95,12 +94,24 @@ func (r *DeviceClusterReconciler) reconcile(ctx context.Context, deviceCluster *
 		return ctrl.Result{}, err
 	}
 
-	// * create a hash depending on changes that impact the device config builder
-	deviceCluster.Annotations[hashForDeviceAnnotation] = hashByteData(map[string][]byte{
+	hashForDevice := map[string][]byte{
 		mqttBrokerHostnameAnnotation: []byte(deviceCluster.GetAnnotations()[mqttBrokerHostnameAnnotation]),
 		mqttBrokerPortAnnotation:     []byte(deviceCluster.GetAnnotations()[mqttBrokerPortAnnotation]),
 		"sensors-topic":              []byte(deviceCluster.Spec.MQTT.SensorsTopic),
-	})
+	}
+	// Get the secret for the device cluster, so we can add it to the hash that retriggers a device config builder job
+	secret := &corev1.Secret{}
+	secretName := deviceCluster.Name + deviceClusterSecretSuffix
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: deviceCluster.Namespace}, secret); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to get secret for device cluster: %w", err)
+		}
+	} else {
+		hashForDevice[hashForDeviceAnnotation] = []byte(hashByteData(secret.Data))
+	}
+
+	// * create a hash depending on changes that impact the device config builder
+	deviceCluster.Annotations[hashForDeviceAnnotation] = hashByteData(hashForDevice)
 
 	return ctrl.Result{}, nil
 }
@@ -122,7 +133,7 @@ func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client
 		if err == nil {
 			return nil
 		}
-		if errors.IsConflict(err) {
+		if apierrors.IsConflict(err) {
 			// Fetch the latest version of the object
 			err = r.Get(ctx, key, existing)
 			if err != nil {
@@ -135,29 +146,6 @@ func (r *DeviceClusterReconciler) CreateOrUpdate(ctx context.Context, obj client
 	return fmt.Errorf("failed to update resource %s/%s after multiple attempts: %w", obj.GetNamespace(), obj.GetName(), err)
 }
 
-func (r *DeviceClusterReconciler) mapServiceToDeviceCluster(ctx context.Context, service client.Object) []reconcile.Request {
-	clusters := &pedgev1alpha1.DeviceClusterList{}
-	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(metav1.ObjectNameField, service.GetName()),
-		Namespace:     service.GetNamespace(),
-	}
-	if err := r.List(ctx, clusters, listOps); err != nil {
-		return []reconcile.Request{}
-	}
-
-	// Create reconcile requests for each device
-	var requests []reconcile.Request
-	for _, device := range clusters.Items {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      device.Name,
-				Namespace: device.Namespace,
-			},
-		})
-	}
-	return requests
-}
-
 // SetupWithManager sets up the controller with the Manager
 func (r *DeviceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -168,5 +156,50 @@ func (r *DeviceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.mapServiceToDeviceCluster),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.mapSecretToDeviceCluster),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+func (r *DeviceClusterReconciler) mapServiceToDeviceCluster(ctx context.Context, service client.Object) []reconcile.Request {
+	cluster := &pedgev1alpha1.DeviceCluster{}
+	err := r.Get(ctx, types.NamespacedName{Name: service.GetName(), Namespace: service.GetNamespace()}, cluster)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      cluster.Name,
+				Namespace: cluster.Namespace,
+			},
+		},
+	}
+}
+
+// Watch logic for the secret related to the device cluster
+func (r *DeviceClusterReconciler) mapSecretToDeviceCluster(ctx context.Context, secret client.Object) []reconcile.Request {
+	// skip if the secret does not end with deviceClusterSecretSuffix
+	if !strings.HasSuffix(secret.GetName(), deviceClusterSecretSuffix) {
+		return []reconcile.Request{}
+	}
+	// strip the suffix to get the device cluster name
+	deviceClusterName := strings.TrimSuffix(secret.GetName(), deviceClusterSecretSuffix)
+	cluster := &pedgev1alpha1.DeviceCluster{}
+	err := r.Get(ctx, types.NamespacedName{Name: deviceClusterName, Namespace: secret.GetNamespace()}, cluster)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      cluster.Name,
+				Namespace: cluster.Namespace,
+			},
+		},
+	}
+
 }

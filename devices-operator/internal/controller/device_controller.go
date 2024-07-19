@@ -34,7 +34,6 @@ const (
 	// and still creates a -user-credentials secret even when asked otherwise. Investigate.
 	deviceSecretSuffix     = "-user-credentials"
 	configBuilderJobSuffix = "-config-build"
-	deviceSecretNameLabel  = "pedge.io/device-secret-name"
 	configJobLabel         = "pedge.io/config-job"
 	deviceClusterLabel     = "pedge.io/device-cluster"
 
@@ -162,11 +161,17 @@ func (r *DeviceReconciler) createSecret(ctx context.Context, device *pedgev1alph
 		}
 	} else {
 		patch := client.MergeFrom(secret.DeepCopy())
+		if secret.Data == nil {
+			secret.Data = make(map[string][]byte)
+		}
 		if _, exists := secret.Data["password"]; !exists {
 			secret.Data["password"] = []byte(generateRandomPassword(16))
 		}
 		if _, exists := secret.Data["username"]; !exists || string(secret.Data["username"]) != device.Name {
 			secret.Data["username"] = []byte(device.Name)
+		}
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
 		}
 		secret.GetAnnotations()[hashForDeviceAnnotation] = hashByteData(secret.Data)
 		// patch the secret with the new labels - not using update but patch to avoid conflicts
@@ -179,7 +184,7 @@ func (r *DeviceReconciler) createSecret(ctx context.Context, device *pedgev1alph
 	if device.Labels == nil {
 		device.Labels = make(map[string]string)
 	}
-	device.Labels[deviceSecretNameLabel] = device.Name + deviceSecretSuffix
+	device.Labels[secretNameLabel] = device.Name + deviceSecretSuffix
 
 	return &secret, nil
 }
@@ -266,6 +271,7 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 	secretsMount := corev1.VolumeMount{
 		Name:      "secrets",
 		MountPath: "/secrets",
+		ReadOnly:  true,
 	}
 	storageMount := corev1.VolumeMount{
 		Name:      "data",
@@ -364,15 +370,6 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 			RestartPolicy: corev1.RestartPolicyOnFailure,
 			Volumes: []corev1.Volume{
 				{
-					Name: secretsMount.Name,
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: device.Name + deviceSecretSuffix,
-							Optional:   func(b bool) *bool { return &b }(true),
-						},
-					},
-				},
-				{
 					Name: outputMount.Name,
 					VolumeSource: corev1.VolumeSource{
 						EmptyDir: &corev1.EmptyDirVolumeSource{},
@@ -383,6 +380,31 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: deviceCluster.Name + artefactSuffix,
+						},
+					},
+				},
+				{
+					Name: secretsMount.Name,
+					VolumeSource: corev1.VolumeSource{
+						Projected: &corev1.ProjectedVolumeSource{
+							Sources: []corev1.VolumeProjection{
+								{
+									Secret: &corev1.SecretProjection{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: deviceCluster.Name + deviceClusterSecretSuffix,
+										},
+										Optional: func(b bool) *bool { return &b }(true),
+									},
+								},
+								{
+									Secret: &corev1.SecretProjection{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: device.Name + deviceSecretSuffix,
+										},
+										Optional: func(b bool) *bool { return &b }(true),
+									},
+								},
+							},
 						},
 					},
 				},
@@ -563,7 +585,7 @@ func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *DeviceReconciler) mapSecretToDevice(ctx context.Context, secret client.Object) []reconcile.Request {
 	// Fetch the list of Devices that use this secret
 	var devices pedgev1alpha1.DeviceList
-	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{deviceSecretNameLabel: secret.GetName()}}
+	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{secretNameLabel: secret.GetName()}}
 	labelMap, _ := metav1.LabelSelectorAsMap(&labelSelector)
 	listOps := &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labelMap),

@@ -10,6 +10,10 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 )
 
+const (
+	secretNameLabel = "pedge.io/secret-name"
+)
+
 func generateRandomPassword(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz" +
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" +
