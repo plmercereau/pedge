@@ -2,13 +2,14 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	pedgev1alpha1 "github.com/plmercereau/pedge/api/v1alpha1"
 	rabbitmqv1 "github.com/rabbitmq/cluster-operator/api/v1beta1"
 	rabbitmqtopologyv1 "github.com/rabbitmq/messaging-topology-operator/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,6 +20,45 @@ import (
 // syncResources creates or updates the associated resources
 func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, deviceCluster *pedgev1alpha1.DeviceCluster) error {
 	logger := log.FromContext(ctx)
+
+	// TODO use possible custom broker/port values in the DeviceCluster spec instead of the service
+	service := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deviceCluster.Name, Namespace: deviceCluster.Namespace}, service); err != nil {
+		logger.Error(err, "unable to fetch service")
+		return err
+	}
+
+	var mqttBroker string
+	if deviceCluster.Spec.MQTT.Hostname != "" {
+		mqttBroker = deviceCluster.Spec.MQTT.Hostname
+	} else {
+		serviceIngress := service.Status.LoadBalancer.Ingress[0]
+		if serviceIngress.Hostname != "" {
+			mqttBroker = serviceIngress.Hostname
+		} else {
+			mqttBroker = serviceIngress.IP
+		}
+	}
+	if mqttBroker == "" {
+		return errors.New("no MQTT broker found")
+	}
+
+	mqttPortInt := 1883
+	if deviceCluster.Spec.MQTT.Port != 0 {
+		mqttPortInt = int(deviceCluster.Spec.MQTT.Port)
+	} else {
+		for _, port := range service.Spec.Ports {
+			if port.Name == "mqtt" {
+				mqttPortInt = int(port.Port)
+				break
+			}
+		}
+	}
+
+	mqttPort := fmt.Sprint(mqttPortInt)
+	deviceCluster.GetAnnotations()[mqttBrokerHostnameAnnotation] = mqttBroker
+	deviceCluster.GetAnnotations()[mqttBrokerPortAnnotation] = mqttPort
+
 	// Define the desired RabbitMQ Cluster resource
 	cluster := &rabbitmqv1.RabbitmqCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -62,7 +102,7 @@ func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, devic
 	// We only create the vhost if it doesn't exist. The RabbitMQ messaging topology operator does not allow to modify it.
 	// TODO we should also block some updates on the devices cluster name - through a validation webhook
 	existingVhost := vhost.DeepCopyObject().(client.Object)
-	if err := r.Get(ctx, client.ObjectKeyFromObject(vhost), existingVhost); err != nil && errors.IsNotFound(err) {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(vhost), existingVhost); err != nil && apierrors.IsNotFound(err) {
 		if err := r.Create(ctx, vhost); err != nil {
 			return err
 		}
@@ -88,7 +128,7 @@ func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, devic
 
 	// We only create the queue if it doesn't exist. The RabbitMQ messaging topology operator does not allow to modify it.
 	existingQueue := queue.DeepCopyObject().(client.Object)
-	if err := r.Get(ctx, client.ObjectKeyFromObject(queue), existingQueue); err != nil && errors.IsNotFound(err) {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(queue), existingQueue); err != nil && apierrors.IsNotFound(err) {
 		if err := r.Create(ctx, queue); err != nil {
 			return err
 		}
@@ -226,13 +266,9 @@ func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, devic
 				changed := false
 				if inject.Annotations != nil {
 					// Add reloader.stakater.com/match: "true" to the secret to trigger a reload of the telegraf config
-					if remoteSecret.Annotations == nil {
-						remoteSecret.Annotations = make(map[string]string)
-						changed = true
-					}
 					for key, value := range inject.Annotations {
-						if remoteSecret.Annotations[key] != value {
-							remoteSecret.Annotations[key] = value
+						if remoteSecret.GetAnnotations()[key] != value {
+							remoteSecret.GetAnnotations()[key] = value
 							changed = true
 						}
 					}

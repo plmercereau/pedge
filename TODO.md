@@ -1,5 +1,4 @@
 - Include the lilygo code into the new esp32 firmware builder
-- rebuild devices configs when the hostname/port/sensor topic changes
 - DeviceGroup
   - used for loading common settings e.g. wifi settings
   - use a selector e.g. on labels
@@ -18,10 +17,9 @@
 ## Backlog
 
 - validation/default hooks
+- implement the firmware build job in the same spirit as the config builder job
 - device sensors
   - should we determine sensors when building the firmware, or in the config partition/file?
-- maybe usefull to create a `Storage` CRD to avoid config duplication?
-  - `deviceClass.spec.storageReference`
 - k8s events in controllers
 - move netboot stuff to another repo
 - dedicated influxdb user for grafana

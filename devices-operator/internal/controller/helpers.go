@@ -2,7 +2,10 @@ package controller
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"math/big"
+	"sort"
 
 	batchv1 "k8s.io/api/batch/v1"
 )
@@ -50,4 +53,21 @@ func equalMaps(a, b map[string]string) bool {
 		}
 	}
 	return true
+}
+
+func hashByteData(data map[string][]byte) string {
+	// Add your hash logic here
+	// For simplicity, we just return a fixed string
+	secretHasher := sha256.New()
+	keys := make([]string, 0, len(data))
+
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	for _, key := range keys {
+		secretHasher.Write([]byte(key))
+		secretHasher.Write(data[key])
+	}
+	return hex.EncodeToString(secretHasher.Sum(nil))
 }
