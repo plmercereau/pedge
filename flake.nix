@@ -54,6 +54,10 @@
                   tilt.exec = ''
                     tilt up
                   '';
+                  rancher.exec = ''
+                    cd rancher-ui-extensions
+                    yarn dev
+                  '';
                 };
                 packages = with pkgs; [
                   kubectl
@@ -67,7 +71,7 @@
                   python313
                   esptool
                   nodejs
-                  nodePackages.pnpm
+                  nodePackages.yarn
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                   (
                     # operator-sdk package not working

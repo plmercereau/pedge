@@ -1,5 +1,6 @@
 load('ext://helm_resource', 'helm_resource', 'helm_repo')
 
+os.putenv('PATH', ('%s:~/.rd/bin' % os.getenv('PATH')))
 # helm_repo('traefik', 'https://traefik.github.io/charts', resource_name='traefik-repo')
 # helm_resource('traefik', 
 #     'traefik/traefik',
@@ -24,7 +25,7 @@ helm_resource('rancher',
     flags = ['--version=2.8.5', 
         '--create-namespace', 
         '--set=ingress.tls.source=rancher',
-        '--set=hostname=rancher.local',
+        ('--set=hostname=%s' % os.getenv('RANCHER_API')),
         '--set=bootstrapPassword=admin'],
     resource_deps=['rancher-repo', 'cert-manager'])
 
