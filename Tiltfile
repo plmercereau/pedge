@@ -1,11 +1,11 @@
 load('ext://helm_resource', 'helm_resource', 'helm_repo')
 
-helm_repo('traefik', 'https://traefik.github.io/charts', resource_name='traefik-repo')
-helm_resource('traefik', 
-    'traefik/traefik',
-    namespace='traefik',
-    flags = ['--version=28.2.0',  '--create-namespace'],
-    resource_deps=['traefik-repo'])
+# helm_repo('traefik', 'https://traefik.github.io/charts', resource_name='traefik-repo')
+# helm_resource('traefik', 
+#     'traefik/traefik',
+#     namespace='traefik',
+#     flags = ['--version=28.2.0',  '--create-namespace'],
+#     resource_deps=['traefik-repo'])
 
 helm_resource('cert-manager', 
     'oci://registry-1.docker.io/bitnamicharts/cert-manager',
@@ -16,6 +16,17 @@ helm_resource('rabbitmq-cluster-operator',
     namespace='rabbitmq-system',
     flags = ['--version=4.2.10', '--create-namespace', '--set=useCertManager=true'],
     resource_deps = [ 'cert-manager'])
+
+helm_repo('rancher', 'https://releases.rancher.com/server-charts/latest', resource_name='rancher-repo')
+helm_resource('rancher', 
+    'rancher/rancher',
+    namespace='cattle-system',
+    flags = ['--version=2.8.5', 
+        '--create-namespace', 
+        '--set=ingress.tls.source=rancher',
+        '--set=hostname=rancher.local',
+        '--set=bootstrapPassword=admin'],
+    resource_deps=['rancher-repo', 'cert-manager'])
 
 
 # TODO wait for rabbitmq-cluster-operator

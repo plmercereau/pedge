@@ -173,7 +173,10 @@ func (r *DeviceReconciler) createSecret(ctx context.Context, device *pedgev1alph
 		if secret.Annotations == nil {
 			secret.Annotations = make(map[string]string)
 		}
-		secret.GetAnnotations()[hashForDeviceAnnotation] = hashByteData(secret.Data)
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
+		}
+		secret.Annotations[hashForDeviceAnnotation] = hashByteData(secret.Data)
 		// patch the secret with the new labels - not using update but patch to avoid conflicts
 		if err := r.Patch(ctx, &secret, patch); err != nil {
 			logger.Error(err, "Unable to patch secret "+secretName)
@@ -206,7 +209,10 @@ func (r *DeviceReconciler) loadDeviceCluster(ctx context.Context, device *pedgev
 		logger.Error(err, "unable to fetch DeviceCluster")
 		return nil, err
 	}
-	device.GetLabels()[deviceClusterLabel] = deviceCluster.Name
+	if device.Labels == nil {
+		device.Labels = make(map[string]string)
+	}
+	device.Labels[deviceClusterLabel] = deviceCluster.Name
 	return deviceCluster, nil
 }
 
@@ -243,10 +249,25 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 		// 2. device class hash
 		// 3. device cluster hahs
 		// TODO 4. DeviceGroup is different
-		deviceAnnotations := device.GetAnnotations()
-		secretHash := secret.GetAnnotations()[hashForDeviceAnnotation]
-		deviceClassHash := deviceClass.GetAnnotations()[hashForDeviceAnnotation]
-		deviceClusterHash := deviceCluster.GetAnnotations()[hashForDeviceAnnotation]
+		deviceAnnotations := device.Annotations
+		if deviceAnnotations == nil {
+			deviceAnnotations = make(map[string]string)
+		}
+		secretAnnotations := secret.Annotations
+		if secretAnnotations == nil {
+			secretAnnotations = make(map[string]string)
+		}
+		secretHash := secretAnnotations[hashForDeviceAnnotation]
+		deviceClassAnnotations := deviceClass.Annotations
+		if deviceClassAnnotations == nil {
+			deviceClassAnnotations = make(map[string]string)
+		}
+		deviceClassHash := deviceClassAnnotations[hashForDeviceAnnotation]
+		deviceClusterAnnotations := deviceCluster.Annotations
+		if deviceClusterAnnotations == nil {
+			deviceClusterAnnotations = make(map[string]string)
+		}
+		deviceClusterHash := deviceClusterAnnotations[hashForDeviceAnnotation]
 		if (deviceAnnotations[secretHashAnnotation] != secretHash) || (deviceAnnotations[deviceClassHashAnnotation] != deviceClassHash) || (deviceAnnotations[deviceClusterHashAnnotation] != deviceClusterHash) {
 			// Delete the existing Job
 			if err := r.Delete(ctx, existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
@@ -413,9 +434,12 @@ func (r *DeviceReconciler) createJob(ctx context.Context, device *pedgev1alpha1.
 	}
 
 	// * Set the new hashes to compare in the next reconciliations
-	device.GetAnnotations()[secretHashAnnotation] = secret.GetAnnotations()[hashForDeviceAnnotation]
-	device.GetAnnotations()[deviceClassHashAnnotation] = deviceClass.GetAnnotations()[hashForDeviceAnnotation]
-	device.GetAnnotations()[deviceClusterHashAnnotation] = deviceCluster.GetAnnotations()[hashForDeviceAnnotation]
+	if device.Annotations == nil {
+		device.Annotations = make(map[string]string)
+	}
+	device.Annotations[secretHashAnnotation] = secret.GetAnnotations()[hashForDeviceAnnotation]
+	device.Annotations[deviceClassHashAnnotation] = deviceClass.GetAnnotations()[hashForDeviceAnnotation]
+	device.Annotations[deviceClusterHashAnnotation] = deviceCluster.GetAnnotations()[hashForDeviceAnnotation]
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,

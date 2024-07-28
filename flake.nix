@@ -50,6 +50,11 @@
                   # go_1_21 # * See https://github.com/operator-framework/operator-sdk/issues/6681
                   package = pkgs.go;
                 };
+                processes = {
+                  tilt.exec = ''
+                    tilt up
+                  '';
+                };
                 packages = with pkgs; [
                   kubectl
                   tilt
@@ -61,6 +66,8 @@
                   act
                   python313
                   esptool
+                  nodejs
+                  nodePackages.pnpm
                   (wrapHelm kubernetes-helm {plugins = [kubernetes-helmPlugins.helm-diff];})
                   (
                     # operator-sdk package not working

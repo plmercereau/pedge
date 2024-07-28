@@ -80,7 +80,10 @@ func (r *DeviceClassReconciler) reconcile(ctx context.Context, deviceClass *pedg
 		logger.Error(err, "Failed to marshal config image")
 		return ctrl.Result{}, err
 	}
-	deviceClass.GetAnnotations()[hashForDeviceAnnotation] = hashByteData(map[string][]byte{
+	if deviceClass.Annotations == nil {
+		deviceClass.Annotations = map[string]string{}
+	}
+	deviceClass.Annotations[hashForDeviceAnnotation] = hashByteData(map[string][]byte{
 		"image": configImageJson,
 	})
 

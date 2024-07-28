@@ -21,43 +21,54 @@ import (
 func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, deviceCluster *pedgev1alpha1.DeviceCluster) error {
 	logger := log.FromContext(ctx)
 
+	// ! Service will only be available AFTER the RabbitMQ cluster is created
+	// TODO move in a separate function e.g. withing reconcile after rabbitmq, and requeue if the service is needed but not yet available
 	// TODO use possible custom broker/port values in the DeviceCluster spec instead of the service
 	service := &corev1.Service{}
 	if err := r.Get(ctx, types.NamespacedName{Name: deviceCluster.Name, Namespace: deviceCluster.Namespace}, service); err != nil {
 		logger.Error(err, "unable to fetch service")
-		return err
-	}
-
-	var mqttBroker string
-	if deviceCluster.Spec.MQTT.Hostname != "" {
-		mqttBroker = deviceCluster.Spec.MQTT.Hostname
+		// return err
 	} else {
-		serviceIngress := service.Status.LoadBalancer.Ingress[0]
-		if serviceIngress.Hostname != "" {
-			mqttBroker = serviceIngress.Hostname
+		var mqttBroker string
+		if deviceCluster.Spec.MQTT.Hostname != "" {
+			mqttBroker = deviceCluster.Spec.MQTT.Hostname
 		} else {
-			mqttBroker = serviceIngress.IP
-		}
-	}
-	if mqttBroker == "" {
-		return errors.New("no MQTT broker found")
-	}
-
-	mqttPortInt := 1883
-	if deviceCluster.Spec.MQTT.Port != 0 {
-		mqttPortInt = int(deviceCluster.Spec.MQTT.Port)
-	} else {
-		for _, port := range service.Spec.Ports {
-			if port.Name == "mqtt" {
-				mqttPortInt = int(port.Port)
-				break
+			if service.Status.LoadBalancer.Ingress == nil || len(service.Status.LoadBalancer.Ingress) == 0 {
+				// TODO handle this case !!!
+				return errors.New("no LoadBalancer found")
+			} else {
+				logger.Info("LoadBalancer found!!!")
+				serviceIngress := service.Status.LoadBalancer.Ingress[0]
+				if serviceIngress.Hostname != "" {
+					mqttBroker = serviceIngress.Hostname
+				} else {
+					mqttBroker = serviceIngress.IP
+				}
 			}
 		}
-	}
+		if mqttBroker == "" {
+			return errors.New("no MQTT broker found")
+		}
 
-	mqttPort := fmt.Sprint(mqttPortInt)
-	deviceCluster.GetAnnotations()[mqttBrokerHostnameAnnotation] = mqttBroker
-	deviceCluster.GetAnnotations()[mqttBrokerPortAnnotation] = mqttPort
+		mqttPortInt := 1883
+		if deviceCluster.Spec.MQTT.Port != 0 {
+			mqttPortInt = int(deviceCluster.Spec.MQTT.Port)
+		} else {
+			for _, port := range service.Spec.Ports {
+				if port.Name == "mqtt" {
+					mqttPortInt = int(port.Port)
+					break
+				}
+			}
+		}
+
+		mqttPort := fmt.Sprint(mqttPortInt)
+		if deviceCluster.Annotations == nil {
+			deviceCluster.Annotations = make(map[string]string)
+		}
+		deviceCluster.Annotations[mqttBrokerHostnameAnnotation] = mqttBroker
+		deviceCluster.Annotations[mqttBrokerPortAnnotation] = mqttPort
+	}
 
 	// Define the desired RabbitMQ Cluster resource
 	cluster := &rabbitmqv1.RabbitmqCluster{
@@ -266,9 +277,12 @@ func (r *DeviceClusterReconciler) syncRabbitmqCluster(ctx context.Context, devic
 				changed := false
 				if inject.Annotations != nil {
 					// Add reloader.stakater.com/match: "true" to the secret to trigger a reload of the telegraf config
+					if remoteSecret.Annotations == nil {
+						remoteSecret.Annotations = map[string]string{}
+					}
 					for key, value := range inject.Annotations {
-						if remoteSecret.GetAnnotations()[key] != value {
-							remoteSecret.GetAnnotations()[key] = value
+						if remoteSecret.Annotations[key] != value {
+							remoteSecret.Annotations[key] = value
 							changed = true
 						}
 					}
