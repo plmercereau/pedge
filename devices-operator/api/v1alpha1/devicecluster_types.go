@@ -65,8 +65,10 @@ type MQTTUser struct {
 
 // DeviceClusterSpec defines the desired state of DeviceCluster
 type DeviceClusterSpec struct {
+	// Configuration for storing and accessing artefacts
 	Artefacts ArtefactsSpec `json:"artefacts,omitempty"`
 	// +kubebuilder:validation:Required
+	// Configuration of the MQTT broker
 	MQTT MQTTSpec `json:"mqtt"`
 }
 

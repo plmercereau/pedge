@@ -35,6 +35,7 @@ spec:
             description: DeviceClusterSpec defines the desired state of DeviceCluster
             properties:
               artefacts:
+                description: Configuration for storing and accessing artefacts
                 properties:
                   image:
                     properties:
@@ -56,6 +57,7 @@ spec:
                     type: object
                 type: object
               mqtt:
+                description: Configuration of the MQTT broker
                 properties:
                   hostname:
                     type: string
