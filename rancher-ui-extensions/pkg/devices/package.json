@@ -1,6 +1,6 @@
 {
-  "name": "top-level-product",
-  "description": "Example extension for a top-level product on Rancher Dashboard",
+  "name": "pedge-devices-rancher-ui-extension",
+  "description": "Extension for the Pedge Devices Operator",
   "version": "0.1.0",
   "private": false,
   "rancher": {
