@@ -5,8 +5,10 @@ product:
   notInstalledHasSchema: The Devices Operator is required to run the Devices extension. To install it please follow the instructions on the official <a target="blank" href="#" target="_blank" rel="noopener nofollow">documentation</a>.
 
 devices:
+  deviceClass:
+    label: Device Class
   deviceCluster:
-    name: Device Cluster
+    label: Device Cluster
     description: "A Device Cluster is a group of devices that share the same configuration and are managed as a single entity. <br><br> The configuration includes the firmware image to be installed on the devices, the hostname of the devices, and the MQTT broker configuration. <br><br> The MQTT broker configuration includes the hostname and port of the broker, the topic where the devices publish their data, and the users allowed to connect to the broker."
     artefacts:
       image:
