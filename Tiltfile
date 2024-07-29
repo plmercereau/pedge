@@ -25,6 +25,7 @@ helm_resource('rancher',
     flags = ['--version=2.8.5', 
         '--create-namespace', 
         '--set=ingress.tls.source=rancher',
+        '--set=replicas=1',
         ('--set=hostname=%s' % os.getenv('RANCHER_API')),
         '--set=bootstrapPassword=admin'],
     resource_deps=['rancher-repo', 'cert-manager'])
